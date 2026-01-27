@@ -2,6 +2,7 @@ import os        # создание относительного пути
 import math
 import zip_util  # модуль от преподавателя
 
+
 # Заменить рабочую директорию на папку, где лежит скрипт
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
@@ -86,12 +87,44 @@ def haversine(lat1, lon1, lat2, lon2):
     @returns:
         вещественное число — расстояние между точками в милях
     '''
-    R = 3958.8  # интернет - радиус Земли в милях
+    R = 3958.8  # радиус Земли в милях
     lat1, lon1, lat2, lon2 = map(math.radians, [lat1, lon1, lat2, lon2])
     dlat = lat2 - lat1
     dlon = lon2 - lon1
     a = math.sin(dlat/2)**2 + math.cos(lat1)*math.cos(lat2)*math.sin(dlon/2)**2
     return 2 * R * math.asin(math.sqrt(a))
+
+# тесты
+def run_tests(zip_codes):
+    print("\n--- START TESTS ---")
+
+    # Тест 1: загрузка данных
+    assert len(zip_codes) > 0, "Ошибка: база данных пуста"
+    print("Test 1 OK: данные загружены")
+
+    # Тест 2: поиск существующего ZIP
+    test_zip = "12180"
+    result = find_zip(zip_codes, test_zip)
+    assert result is not None, "Ошибка: ZIP 12180 не найден"
+    print("Test 2 OK: поиск ZIP работает")
+
+    # Тест 3: поиск несуществующего ZIP
+    result = find_zip(zip_codes, "00000")
+    assert result is None, "Ошибка: найден несуществующий ZIP"
+    print("Test 3 OK: обработка неверного ZIP")
+
+    # Тест 4: поиск города и штата
+    zips = find_city_state(zip_codes, "Troy", "NY")
+    assert len(zips) > 0, "Ошибка: ZIP-коды города Troy не найдены"
+    print("Test 4 OK: поиск по городу и штату")
+
+    # Тест 5: расстояние
+    d = haversine(42.673701, -73.608792, 40.922326, -72.637078)
+    assert d > 0, "Ошибка: расстояние некорректно"
+    print("Test 5 OK: расчёт расстояния")
+
+    print("--- ALL TESTS PASSED ---\n")
+
 
 # код-основа
 def main():
@@ -170,4 +203,6 @@ def main():
             print(f"The distance between {zip1} and {zip2} is {dist:.2f} miles")
 
 if __name__ == "__main__":
+    zip_codes = zip_util.read_zip_all()
+#    run_tests(zip_codes)   # активация тестирования
     main()
