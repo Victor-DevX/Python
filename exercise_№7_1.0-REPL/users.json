@@ -1,0 +1,10 @@
+{
+    "admin": {
+        "password": "$2b$12$9Fw7l96wy31CNp7UUJVEFONqvdCPasazpTPcowS45TP7YR13NcZQm",
+        "role": "admin"
+    },
+    "aaa": {
+        "password": "$2b$12$/C4Y.c4p95WC28aUQqT/ou9gJB9gNzsKZu16wVMCo/r2nzQBQoI1.",
+        "role": "user"
+    }
+}
