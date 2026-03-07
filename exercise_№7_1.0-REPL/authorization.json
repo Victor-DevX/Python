@@ -1,5 +1,0 @@
-{
-  "admin": ["list", "search", "view", "review", "delete", "loc", "zip", "dist"],
-  "user": ["list", "search", "view", "review", "loc", "zip", "dist"],
-  "": ["reg", "login", "end"]
-}
