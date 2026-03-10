@@ -187,12 +187,16 @@ def list_markets_ui(markets):
                 print("Неверная команда. Используйте: info <номер>")
         elif cmd == "dist":
             try:
-                coords = input("Укажите свои координаты в виде x,y: ").strip()
-                x_str, y_str = coords.split(",")
-                user_x, user_y = float(x_str), float(y_str)
-                nearest = find_nearest_market(filtered_markets, user_x, user_y)
-                dist_km = haversine(user_y, user_x, nearest["y"], nearest["x"])
-                current_coords = (user_x, user_y)
+                coords = input("Укажите свои координаты в виде широта,долгота, например 52.3676,4.9041 : ").strip()
+                lat_str, lon_str = coords.split(",")
+
+                user_lat = float(lat_str)
+                user_lon = float(lon_str)
+
+                nearest = find_nearest_market(filtered_markets, user_lon, user_lat)
+                dist_km = haversine(user_lat, user_lon, nearest["y"], nearest["x"])
+
+                current_coords = (user_lon, user_lat)
                 print(f"\nБлижайший рынок найден:")
                 # Отображаем только этот рынок в списке
                 filtered_markets = [nearest]
@@ -378,45 +382,67 @@ def search_menu():
 def review_menu():
     """
     @requires: current_user содержит 'username'
-    @modifies: Отзывы рынка через add_review
-    @effects: Позволяет пользователю добавить отзыв к рынку по ZIP, обновляет средний рейтинг
-    @raises: Ничего, ошибки ввода логируются
+    @modifies: REVIEWS_FILE
+    @effects: Позволяет пользователю добавить отзыв к выбранному рынку
+    @raises: Ничего, ошибки ввода обрабатываются
     @returns: None
     """
+
     zip_code = input("Укажите ZIP код рынка: ").strip()
+
     markets = load_markets()
-    
-    # Ищем рынок по ZIP
-    market = None
-    for m in markets:
-        if str(m.get("zip","")) == zip_code:
-            market = m
-            break
-    
-    if not market:
-        print("Рынок с таким ZIP кодом не найден.")
+    zip_markets = [m for m in markets if str(m.get("zip","")) == zip_code]
+
+    if not zip_markets:
+        print("Рынки с таким ZIP кодом не найдены.")
         return
 
-    print(f"Добавление отзыва для: {market.get('MarketName','')} ({market.get('city','')})")
+    print("\nНайденные рынки:")
 
-    # Ввод рейтинга
+    for i, m in enumerate(zip_markets, 1):
+        print(f"{i}. {m.get('MarketName')} - {m.get('city')}")
+
+    print("\nВведите номер рынка для добавления отзыва.")
+    print("Введите q чтобы вернуться в главное меню.")
+
+    choice = input("Ваш выбор: ").strip().lower()
+
+    if choice == "q":
+        return
+
+    if not choice.isdigit():
+        print("Неверный ввод.")
+        return
+
+    idx = int(choice)
+
+    if idx < 1 or idx > len(zip_markets):
+        print("Неверный номер рынка.")
+        return
+
+    market = zip_markets[idx - 1]
+
+    print(f"\nДобавление отзыва для: {market.get('MarketName')} ({market.get('city')})")
+
+    # ввод рейтинга
     while True:
         try:
             rating = int(input("Рейтинг (1-5): ").strip())
             if 1 <= rating <= 5:
                 break
             else:
-                print("Рейтинг должен быть от 1 до 5")
+                print("Рейтинг должен быть от 1 до 5.")
         except ValueError:
-            print("Введите число от 1 до 5")
+            print("Введите число от 1 до 5.")
 
-    # Ввод комментария
     text = input("Комментарий: ").strip()
 
-    # Добавляем отзыв, передавая ZIP и username текущего пользователя
-    add_review(market.get("zip"), current_user["username"], rating, text)
-    
-    avg = get_average_rating(market.get("zip"))
+    fmid = market.get("FMID")
+
+    add_review(fmid, current_user["username"], rating, text)
+
+    avg = get_average_rating(fmid)
+
     print("\nОтзыв добавлен.")
     print(f"Средний рейтинг рынка: {avg}")
 
