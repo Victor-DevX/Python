@@ -326,39 +326,40 @@ def show_market_details(market, user_coords=None):
     """
     @requires: market — словарь с информацией о рынке, user_coords — кортеж (x, y) или None
     @modifies: Ничего
-    @effects: Выводит полные детали рынка, товары, отзывы и средний рейтинг
+    @effects: Выводит полные детали рынка, товары, отзывы и средний рейтинг.
+              Для товаров выводятся только те, где в CSV стоит 'Y'.
     @raises: Ничего
-    @returns: Ничего
+    @returns: None
     """
     print(f"\n=== {market.get('MarketName','Без имени')} ===")
     print(f"Адрес: {market.get('street','')}")
     print(f"Город: {market.get('city','')}, Штат: {market.get('State','')}, ZIP: {market.get('zip','')}")
-    
+
     x = market.get("x")
     y = market.get("y")
     if x is not None and y is not None:
         print(f"Координаты: ({x},{y})")
         if user_coords:
             try:
-                # y=lat, x=lon
                 dist = haversine(user_coords[1], user_coords[0], y, x)
                 print(f"Расстояние от вас: {dist:.2f} км")
             except Exception:
                 print("Расстояние не вычислено")
-    
-    # Вывод доступных товаров
+
+    # Вывод доступных товаров: только те, где 'Y'
     product_fields = [
         "Organic", "Bakedgoods", "Cheese", "Crafts", "Flowers", "Eggs", "Seafood",
         "Herbs", "Vegetables", "Honey", "Jams", "Maple", "Meat", "Nursery", "Nuts",
         "Plants", "Poultry", "Prepared", "Soap", "Trees", "Wine", "Coffee", "Beans",
         "Fruits", "Grains", "Juices", "Mushrooms", "PetFood", "Tofu", "WildHarvested"
     ]
-    products_available = [p for p in product_fields if market.get(p) and market[p].strip()]
+    products_available = [p for p in product_fields if market.get(p, "").upper() == "Y"]
+
     if products_available:
         print("Товары/услуги на рынке:", ", ".join(products_available))
     else:
         print("Информация о товарах отсутствует.")
-    
+
     # Отзывы
     reviews = get_reviews_by_fmid(market.get("FMID")) or []
     if not reviews:
@@ -367,7 +368,7 @@ def show_market_details(market, user_coords=None):
         print("\nОтзывы:")
         for r in reviews:
             print(f"{r.get('username','')} ({r.get('rating','')}): {r.get('text','')}")
-    
+
     # Средний рейтинг
     avg = get_average_rating(market.get("FMID"))
     if avg is not None:
