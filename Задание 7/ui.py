@@ -21,13 +21,30 @@ from logger import logger
 
 current_user = {"username": None, "role": None}
 
+def input_q(prompt: str):
+    """
+    @requires: prompt — строка приглашения для ввода пользователя
+    @modifies: Ничего
+    @effects: Запрашивает ввод пользователя через input(), удаляет пробелы по краям строки.
+              Если пользователь вводит 'q' (в любом регистре), возвращает None,
+              что используется вызывающей функцией как сигнал выхода в предыдущее меню.
+    @raises: Ничего
+    @returns: str — введённая пользователем строка без пробелов по краям,
+              либо None если введено 'q'
+    """
+    value = input(prompt).strip()
+    if value.lower() == "q":
+        return None
+    return value
+
+
 def main_menu():
     """
     @requires: Ничего
     @modifies: current_user
     @effects: Запускает главное REPL меню, обрабатывает команды login, register, list, review, delete, logout, exit
     @raises: Ничего
-    @returns: None
+    @returns: Ничего
     """
     while True:
         print("\n=== Главное меню ===")
@@ -74,10 +91,15 @@ def login_menu():
     @modifies: current_user
     @effects: Выполняет вход пользователя, обновляет current_user при успешном входе
     @raises: Ничего, ошибки входа логируются
-    @returns: None
+    @returns: Ничего
     """
-    username = input("Имя пользователя: ").strip()
-    password = input("Пароль: ").strip()
+    username = input_q("Имя пользователя (q — выход): ")
+    if username is None:
+        return
+
+    password = input_q("Пароль (q — выход): ")
+    if password is None:
+        return
 
     success, result = login_user(username, password)
     if success:
@@ -92,28 +114,55 @@ def login_menu():
 
 def register_menu():
     """
-    @requires: Ничего
-    @modifies: current_user
-    @effects: Выполняет вход пользователя, обновляет current_user при успешном входе
-    @raises: Ничего, ошибки входа логируются
+    @requires: Функция register_user(username, password, first_name, last_name, middle_name)
+               должна быть доступна из модуля auth. Логин и пароль — строки, логин ≥2 символов,
+               пароль ≥4 символов, без пробелов.
+    @modifies: Файл пользователей через функцию register_user
+    @effects: Запрашивает у пользователя логин, пароль и персональные данные.
+              Проверяет корректность логина и пароля. Позволяет выйти в главное меню
+              при вводе 'q'. Если ввод корректен, вызывает auth.register_user для создания
+              нового пользователя и выводит сообщение о результате регистрации.
+    @raises: Ничего, ошибки регистрации обрабатываются и выводятся
     @returns: None
     """
-    print("\n=== Регистрация нового пользователя ===")
-    username = input("Введите имя пользователя: ").strip()
-    password = input("Введите пароль: ").strip()
+
+    while True:
+        username = input("Введите логин (min 2 символа, без пробелов, q — выход): ").strip()
+        if username.lower() == "q":
+            return
+
+        if len(username) < 2:
+            print("Ошибка: логин должен содержать минимум 2 символа.")
+            continue
+
+        if " " in username:
+            print("Ошибка: логин не должен содержать пробелы.")
+            continue
+        break
+
+    while True:
+        password = input("Введите пароль (min 4 символа, q — выход): ").strip()
+        if password.lower() == "q":
+            return
+
+        if len(password) < 4:
+            print("Ошибка: пароль должен содержать минимум 4 символа.")
+            continue
+        break
+
     first_name = input("Имя: ").strip()
     last_name = input("Фамилия: ").strip()
-    middle_name = input("Отчество (необязательно): ").strip()
+    middle_name = input("Отчество: ").strip()
 
-    try:
-        success, msg = register_user(username, password, first_name, last_name, middle_name)
-    except Exception as e:
-        print("Произошла ошибка при регистрации:", e)
-        return
+    success, message = register_user(
+        username,
+        password,
+        first_name,
+        last_name,
+        middle_name
+    )
 
-    print(msg)
-    if success:
-        logger.info(f"Новый пользователь '{username}' зарегистрирован")
+    print(message)
 
 MARKETS_PER_PAGE = 15
 
@@ -123,7 +172,7 @@ def list_markets_ui(markets):
     @modifies: Ничего
     @effects: Обеспечивает постраничный просмотр рынков с поиском, показом деталей, навигацией и функцией ближайшего рынка
     @raises: Исключения при неверном вводе команд, ошибки логируются
-    @returns: None
+    @returns: Ничего
     """
     page = 1
     total_pages = (len(markets) + MARKETS_PER_PAGE - 1) // MARKETS_PER_PAGE
@@ -135,7 +184,7 @@ def list_markets_ui(markets):
         page_markets = filtered_markets[start:start + MARKETS_PER_PAGE]
 
         print(f"\n=== Страница {page} из {total_pages} ===")
-        for idx, m in enumerate(page_markets, start=1):
+        for idx, m in enumerate(page_markets, start + 1):
             name = m.get("MarketName", "Без имени")
             city = m.get("city", "")
             print(f"{idx}. {name} - {city}")
@@ -177,8 +226,8 @@ def list_markets_ui(markets):
             parts = cmd.split()
             if len(parts) == 2 and parts[1].isdigit():
                 idx = int(parts[1])
-                if 1 <= idx <= len(page_markets):
-                    market = page_markets[idx - 1]
+                if 1 <= idx <= len(filtered_markets):
+                    market = filtered_markets[idx - 1]
                     show_market_details(market, current_coords)
                     input("\nНажмите Enter чтобы вернуться к списку...")
                 else:
@@ -256,7 +305,7 @@ def show_nearest_market(markets, user_x, user_y):
     @modifies: Ничего
     @effects: Находит ближайший рынок к координатам пользователя и выводит его
     @raises: ValueError если рынок с координатами отсутствует
-    @returns: None
+    @returns: Ничего
     """
     try:
         nearest = find_nearest_market(markets, user_x, user_y)
@@ -279,7 +328,7 @@ def show_market_details(market, user_coords=None):
     @modifies: Ничего
     @effects: Выводит полные детали рынка, товары, отзывы и средний рейтинг
     @raises: Ничего
-    @returns: None
+    @returns: Ничего
     """
     print(f"\n=== {market.get('MarketName','Без имени')} ===")
     print(f"Адрес: {market.get('street','')}")
@@ -332,7 +381,7 @@ def search_menu():
     @modifies: Ничего
     @effects: Выполняет поиск рынков по ZIP или "штат, город" и показывает результаты через list_markets_ui
     @raises: Ничего
-    @returns: None
+    @returns: Ничего
     """
     query = input(
         'Введите сведения о рынке, который необходимо найти в формате "штат, город" или ZIP код: '
@@ -385,10 +434,12 @@ def review_menu():
     @modifies: REVIEWS_FILE
     @effects: Позволяет пользователю добавить отзыв к выбранному рынку
     @raises: Ничего, ошибки ввода обрабатываются
-    @returns: None
+    @returns: Ничего
     """
 
-    zip_code = input("Укажите ZIP код рынка: ").strip()
+    zip_code = input_q("Укажите ZIP код рынка (q — выход): ")
+    if zip_code is None:
+        return
 
     markets = load_markets()
     zip_markets = [m for m in markets if str(m.get("zip","")) == zip_code]
@@ -405,7 +456,10 @@ def review_menu():
     print("\nВведите номер рынка для добавления отзыва.")
     print("Введите q чтобы вернуться в главное меню.")
 
-    choice = input("Ваш выбор: ").strip().lower()
+    choice = input_q("Ваш выбор (q — выход): ")
+    if choice is None:
+        return
+    choice = choice.lower()
 
     if choice == "q":
         return
@@ -452,12 +506,26 @@ def delete_menu():
     @modifies: markets.json через delete_market
     @effects: Позволяет удалить рынок по FMID
     @raises: Ничего, ошибки удаления логируются
-    @returns: None
+    @returns: Ничего
     """
-    fmid = input("FMID: ").strip()
-    confirm = input(f"Подтвердите удаление рынка {fmid} (y/n): ").strip().lower()
-    if confirm == "y":
-        if delete_market(fmid):
-            print(f"Рынок {fmid} удален.")
+    while True:
+        fmid = input("FMID (q — выход): ").strip()
+
+        if fmid.lower() == "q":
+            return
+
+        confirm = input(f"Подтвердите удаление рынка {fmid} (y/n): ").strip().lower()
+
+        if confirm == "y":
+            if delete_market(fmid):
+                print(f"Рынок {fmid} удален.")
+            else:
+                print("Ошибка удаления. Рынок не найден или произошла ошибка.")
+            return
+
+        elif confirm == "n":
+            print("Удаление отменено. Введите другой FMID или q для выхода.")
+            continue
+
         else:
-            print("Ошибка удаления. Рынок не найден или произошла ошибка.")
+            print("Введите y или n.")
