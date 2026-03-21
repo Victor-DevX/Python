@@ -6,7 +6,7 @@
 import os
 import json
 from auth import login_user, register_user
-from model import (
+from kernel import (
     load_markets,
     search_markets,
     get_reviews_by_fmid,
