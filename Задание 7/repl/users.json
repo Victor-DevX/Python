@@ -1,0 +1,42 @@
+{
+    "admin": {
+        "username": "admin",
+        "password": "$2b$12$y0SNslE0vC.ZqDAUeruLPOoeJITfsM9uaX3Jj0wE5ZSTbwPfgMF2i",
+        "first_name": "",
+        "last_name": "",
+        "middle_name": "",
+        "role": "admin"
+    },
+    "123": {
+        "username": "123",
+        "password": "$2b$12$92isavkrrduuPqSsi1MxROSIR0xvOK2/794ibdXbY0BXq2wx2p9jm",
+        "first_name": "Natasha",
+        "last_name": "Lemeshkina",
+        "middle_name": "",
+        "role": "user"
+    },
+    "111": {
+        "username": "111",
+        "password": "$2b$12$b/8mPQlqP.Xbc351rmA3heUhomtFqRhMjLFgCKqGbdva4486rSWfy",
+        "first_name": "111",
+        "last_name": "111",
+        "middle_name": "",
+        "role": "user"
+    },
+    "222": {
+        "username": "222",
+        "password": "$2b$12$GAHyNUjZ1M5V9Jk5f3zHm.4kYOggOM11k8f6FJs2hREosPYV9M9yq",
+        "first_name": "222",
+        "last_name": "222",
+        "middle_name": "",
+        "role": "user"
+    },
+    "333": {
+        "username": "333",
+        "password": "$2b$12$AQH5G.f/4As4THU1XoMLhOgOQNy9U/GhI6abAjjB0FP7LGzv0laby",
+        "first_name": "333",
+        "last_name": "333",
+        "middle_name": "",
+        "role": "user"
+    }
+}
