@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<title>Medical CRM</title>
+
+<style>
+:root {
+  --green: #4CAF50;
+  --green-dark: #3f9442;
+  --bg: #f5f7fa;
+  --card: #ffffff;
+  --text: #2c3e50;
+  --border: #e3e6ea;
+}
+
+/* BASE */
+body {
+  margin:0;
+  font-family: "Segoe UI", Arial;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* HEADER */
+header {
+  background: var(--green);
+  color: white;
+  padding: 16px 24px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  font-size:18px;
+  font-weight:600;
+}
+
+/* CONTAINER */
+.container {
+  max-width:1100px;
+  margin:auto;
+  padding:24px;
+}
+
+/* CARD */
+.card {
+  background: var(--card);
+  border-radius:14px;
+  padding:20px;
+  margin-bottom:20px;
+  box-shadow:0 4px 14px rgba(0,0,0,0.04);
+}
+
+/* INPUTS */
+input, select {
+  width:100%;
+  padding:10px;
+  border-radius:8px;
+  border:1px solid var(--border);
+  margin-bottom:10px;
+  font-size:14px;
+}
+
+/* BUTTON */
+button {
+  background: var(--green);
+  color:white;
+  border:none;
+  padding:10px 14px;
+  border-radius:8px;
+  cursor:pointer;
+  font-weight:500;
+}
+
+button:hover {
+  background: var(--green-dark);
+}
+
+/* secondary */
+.btn-secondary {
+  background:#e5e7eb;
+  color:#333;
+}
+
+.btn-secondary:hover {
+  background:#d6d9de;
+}
+
+/* TABLE */
+table {
+  width:100%;
+  border-collapse:collapse;
+  margin-top:10px;
+}
+
+th {
+  text-align:left;
+  padding:10px;
+  background:#f0f2f5;
+  font-size:13px;
+}
+
+td {
+  padding:10px;
+  border-top:1px solid var(--border);
+  font-size:14px;
+}
+
+tr:hover {
+  background:#f9fafb;
+}
+
+/* FLEX */
+.row {
+  display:flex;
+  gap:10px;
+}
+
+.row > * {
+  flex:1;
+}
+
+/* HIDDEN */
+.hidden {
+  display:none;
+}
+
+/* FILE BUTTON */
+.file-btn {
+  background:transparent;
+  border:none;
+  cursor:pointer;
+  font-size:16px;
+}
+
+/* STATUS */
+.done {
+  opacity:0.6;
+}
+
+
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* MODAL */
+.modal {
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.5);
+  display:flex;
+  justify-content:center;
+  align-items:center;
+}
+
+.modal-content {
+  background:white;
+  padding:20px;
+  border-radius:12px;
+  width:360px;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  Medical CRM
+  <div id="userPanel" class="hidden">
+    <span id="userName"></span>
+    <button class="btn-secondary" onclick="logout()">Выйти</button>
+  </div>
+</header>
+
+<div class="container">
+
+<!-- AUTH -->
+<div id="authBlock" class="card">
+  <h3>Авторизация</h3>
+
+  <input id="username" placeholder="Логин или Email">
+  <input id="password" type="password" placeholder="Пароль">
+
+  <button onclick="login()">Войти</button>
+  <button class="btn-secondary" onclick="toggleRegister()">Регистрация</button>
+
+  <button class="btn-secondary" onclick="showReset()">Забыли пароль?</button>
+
+
+  <div id="registerBlock" class="hidden">
+    <input id="reg_username" placeholder="Логин">
+    <input id="reg_email" placeholder="Email">
+    <input id="reg_password" type="password" placeholder="Пароль">
+    <input id="reg_first" placeholder="Имя">
+    <input id="reg_last" placeholder="Фамилия">
+
+    <button onclick="register()">Создать аккаунт</button>
+  </div>
+</div>
+
+<div id="resetBlock" class="hidden">
+  <h3>Восстановление пароля</h3>
+  <input id="reset_login" placeholder="Логин или Email">
+  <input id="reset_password" type="password" placeholder="Новый пароль">
+  <button onclick="setPassword()">Сохранить пароль</button>
+</div>
+
+<!-- MAIN -->
+<div id="mainContent" class="hidden">
+
+<!-- CREATE -->
+<div class="card">
+  <h3>Запись на прием</h3>
+
+  <select id="spec_select"></select>
+  <select id="doctor_select"></select>
+
+  <div class="row">
+    <input type="date" id="date">
+    <select id="time"></select>
+  </div>
+
+  <input type="file" id="file">
+
+  <button onclick="createAppointment()">Записаться</button>
+</div>
+
+<!-- APPOINTMENTS -->
+<div class="card">
+  <h3>Мои записи</h3>
+
+  <table id="appointments">
+    <thead>
+      <tr>
+        <!-- <th>ID</th> -->
+        <th>Дата</th>
+        <th>Врач</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<!-- RECORDS -->
+<div id="recordsBlock" class="card hidden">
+  <h3>Результаты приема</h3>
+
+  <table id="records">
+    <thead>
+      <tr>
+        <th>Дата</th>
+        <th>Диагноз</th>
+        <th>Препараты</th>
+        <th>Рекомендации</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+</div>
+
+<script>
+let token = localStorage.getItem("token");
+const API = "http://127.0.0.1:8000";
+
+
+spec_select.onchange = loadDoctors;
+
+function initTime(){
+  time.innerHTML = "";
+  for(let h=8; h<=20; h++){
+    ["00","30"].forEach(m=>{
+      let val = `${String(h).padStart(2,'0')}:${m}`;
+      time.innerHTML += `<option value="${val}">${val}</option>`;
+    });
+  }
+}
+
+
+function getAuthHeaders(){
+  if(!token) return {};
+  return { Authorization: "Bearer " + token };
+}
+
+
+/* Авторизация */
+async function login(){
+  if(!username.value || !password.value){
+  alert("Введите логин и пароль");
+  return;
+  }
+  const res = await fetch(API+"/login",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({
+      username: username.value,
+      password: password.value,
+    }) 
+  });
+
+  const data = await res.json();
+  if(res.status>=400){
+  if(data.detail === "RESET_REQUIRED"){
+    authBlock.classList.add("hidden");
+    resetBlock.classList.remove("hidden");
+  } else {
+    alert(data.detail);
+  }
+  return;
+  }
+
+  token = data.access_token;
+  localStorage.setItem("token", token);
+
+  const me = await fetch(API+"/me",{headers:getAuthHeaders()});
+  const user = await me.json();
+
+  userName.innerText = user.last_name+" "+user.first_name;
+
+  authBlock.classList.add("hidden");
+  mainContent.classList.remove("hidden");
+  userPanel.classList.remove("hidden");
+
+  loadAppointments();
+  
+}
+
+
+/* Восстановление пароля */
+function showReset(){
+  authBlock.classList.add("hidden");
+  resetBlock.classList.remove("hidden");
+}
+
+
+/* Выход из системы */
+function logout(){
+  token = null;
+  localStorage.removeItem("token");
+  authBlock.classList.remove("hidden");
+  mainContent.classList.add("hidden");
+  userPanel.classList.add("hidden");
+}
+
+
+/* ???? */
+function toggleRegister(){
+  registerBlock.classList.toggle("hidden");
+}
+
+
+/* Регистрация  */
+async function register(){
+  if(!reg_username.value || !reg_email.value || !reg_password.value){
+  alert("Заполните обязательные поля");
+  return;
+  }
+  const res = await fetch(API+"/register",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({
+      username: reg_username.value,
+      email: reg_email.value,
+      password: reg_password.value,
+      role:"patient",
+      first_name: reg_first.value,
+      last_name: reg_last.value
+    })
+  });
+
+  const data = await res.json();
+
+  if(res.status>=400){
+    alert(data.detail);
+    return;
+  }
+
+  alert("Аккаунт создан");
+  username.value = reg_username.value;
+  registerBlock.classList.add("hidden");
+}
+
+
+/* Сброс пароля  */
+async function setPassword(){
+
+  if(!reset_login.value || !reset_password.value){
+    alert("Введите логин и новый пароль");
+    return;
+  }
+
+  const res = await fetch(API+"/auth/reset-password",{
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json"
+    },
+    body: JSON.stringify({
+      username: reset_login.value,
+      new_password: reset_password.value
+    })
+  });
+
+  const data = await res.json();
+
+  if(res.status>=400){
+    alert(data.detail);
+    return;
+  }
+
+  alert("Пароль установлен. Теперь войдите.");
+
+  username.value = reset_login.value;
+
+  reset_login.value = "";
+  reset_password.value = "";
+
+  resetBlock.classList.add("hidden");
+  authBlock.classList.remove("hidden");
+}
+
+
+/* Данные */
+
+async function loadSpecialties(){
+  const res = await fetch(API+"/specialties");
+  const data = await res.json();
+
+  spec_select.innerHTML="";
+  data.forEach(s=>{
+    spec_select.innerHTML+=`<option value="${s.id}">${s.name}</option>`;
+  });
+  if (data.length > 0) {
+  loadDoctors();
+  }
+}
+
+async function loadDoctors(){
+  if (!spec_select.value) return;
+  
+  const res = await fetch(API+`/doctors?specialty_id=${spec_select.value}`);
+  const data = await res.json();
+
+  doctor_select.innerHTML="";
+  data.forEach(d=>{
+    doctor_select.innerHTML+=`<option value="${d.id}">
+      ${d.specialty} — ${d.last_name} ${d.first_name}
+    </option>`;
+  });
+}
+
+async function createAppointment(){
+  if (!date.value || !time.value) {
+    alert("Выберите дату и время");
+    return;
+    }
+  
+  if (!doctor_select.value) {
+      alert("Выберите врача");
+      return;
+    }
+
+  const localDate = new Date(`${date.value}T${time.value}:00`);
+  const datetime = localDate.toISOString(); 
+
+  const res = await fetch(API+"/appointments",{
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json",
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify({
+      doctor_id: parseInt(doctor_select.value),
+      datetime
+    })
+  });
+
+  const data = await res.json();
+  if(res.status>=400){ alert(data.detail); return;}
+
+  const id = data.appointment_id;
+
+  const fileInput = document.getElementById("file");
+
+  if(fileInput.files.length){
+    const form = new FormData();
+    form.append("file", fileInput.files[0]);
+    form.append("appointment_id", id);
+
+    await fetch(API+"/upload",{
+      method:"POST",
+      headers:getAuthHeaders(),
+      body:form
+    });
+  }
+
+  loadAppointments();
+  fileInput.value = "";
+}
+
+
+document.addEventListener("DOMContentLoaded", () => {
+  initTime();
+  loadSpecialties();
+
+  const today = new Date().toISOString().split("T")[0];
+  date.min = today;
+  date.value = "";
+  time.value = "";
+});
+
+
+
+/* Автологин для удержания сессии */
+if (token && token !== "null") {
+  autoLogin();
+}
+
+async function autoLogin() {
+  try {
+    const me = await fetch(API+"/me",{headers:getAuthHeaders()});
+    if (!me.ok) throw new Error();
+
+    const user = await me.json();
+
+    userName.innerText = user.last_name+" "+user.first_name;
+
+    authBlock.classList.add("hidden");
+    mainContent.classList.remove("hidden");
+    userPanel.classList.remove("hidden");
+
+    loadAppointments();
+  } catch {
+    logout();
+  }
+}
+
+
+/* Таблица */
+
+async function loadAppointments(){
+  const res = await fetch(API+"/patient/appointments",{
+    headers:getAuthHeaders()
+  });
+
+  const data = await res.json();
+  const tbody = document.querySelector("#appointments tbody");
+
+  if (!data.length) {
+    tbody.innerHTML = "<tr><td colspan='3'>Нет записей</td></tr>";
+    return;
+  }
+
+  tbody.innerHTML = "";
+
+  data
+  .sort((a,b)=> new Date(b.appointment_datetime) - new Date(a.appointment_datetime))
+  .forEach(a=>{
+    const tr = document.createElement("tr");
+
+    tr.innerHTML=`
+     <td>${formatDate(a.appointment_datetime)}</td>
+     <td>${a.last_name} ${a.first_name}</td>
+     <td class="actions">
+     <button onclick="loadFiles(${a.id})">Прикрепленные файлы</button>
+     <button onclick="openRecords(${a.id})">Результат приема</button>
+  </td>
+    `;
+
+    tbody.appendChild(tr);
+  });
+}
+
+
+function formatDate(dt){
+  const d = new Date(dt);
+  return d.toLocaleDateString() + " " + d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+}
+
+
+/* Записи */
+
+async function openRecords(id){
+  const res = await fetch(API+"/patient/records",{headers:getAuthHeaders()});
+  const data = await res.json();
+
+  const hasRecord = data.some(r => Number(r.appointment_id) === Number(id));
+
+  if (!hasRecord) {
+    alert("Результат приема еще не создан");
+    return;
+  }
+
+  const tbody = document.querySelector("#records tbody");
+
+  tbody.innerHTML="";
+
+    data.filter(r=>r.appointment_id===id).forEach(r=>{
+      tbody.innerHTML+=`
+        <tr>
+          <td>${formatDate(r.visit_datetime)}</td>
+          <td>${r.diagnosis||""}</td>
+          <td>${r.medication||""}</td>
+          <td>${r.recommendations||""}</td>
+        </tr>
+      `;
+    });
+
+    recordsBlock.classList.remove("hidden");
+}
+
+/* Файлы */
+
+async function loadFiles(id){
+  const res = await fetch(API+`/appointment/${id}/files`,{
+    headers:getAuthHeaders()
+  });
+
+  const files = await res.json();
+
+  if(!files.length){
+    alert("Нет файлов");
+    return;
+  }
+
+  let html="";
+  files.forEach(f=>{
+    html+=`<div>${f.filename}
+      <button onclick="downloadFile('${f.file_id}','${f.filename}')">⬇️</button>
+    </div>`;
+  });
+
+  const win = window.open();
+  win.document.write(html);
+}
+
+async function downloadFile(id,name){
+  const res = await fetch(API+`/file/${id}`,{
+    headers:getAuthHeaders()
+  });
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+
+  const a=document.createElement("a");
+  a.href=url;
+  a.download=name;
+  a.click();
+}
+</script>
+
+</body>
+</html>
