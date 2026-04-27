@@ -1,6 +1,7 @@
 import os
 from jose import JWTError, jwt
 from datetime import datetime, timedelta, timezone
+from collections import defaultdict
 from database import get_db_cursor
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -26,6 +27,12 @@ ALGORITHM = "HS256"
 # Время жизни access-токена (в минутах)
 ACCESS_TOKEN_EXPIRE_MINUTES = 720
 
+# Защита от brute-force (in-memory)
+MAX_LOGIN_ATTEMPTS = 5
+LOCKOUT_MINUTES = 15
+
+login_attempts = defaultdict(int)
+lockout_until = {}
 
 
 # Генерация JWT токена с добавлением времени истечения (exp)
@@ -89,6 +96,71 @@ def decode_token(token: str):
         raise HTTPException(status_code=401, detail="Invalid token")
 
     
+def check_login_allowed(identifier: str):
+    """
+    Проверяет, не заблокирован ли пользователь временно.
+    """
+    blocked_until = lockout_until.get(identifier)
+
+    if blocked_until:
+        if datetime.now(timezone.utc) < blocked_until:
+            remaining = int((blocked_until - datetime.now(timezone.utc)).total_seconds() // 60) + 1
+
+            log_error(
+                "Попытка входа в заблокированный аккаунт",
+                username=identifier,
+                blocked_until=blocked_until.isoformat()
+            )
+
+            raise HTTPException(
+                status_code=429,
+                detail=f"Слишком много попыток. Повторите через {remaining} мин."
+            )
+
+        # блокировка истекла
+        del lockout_until[identifier]
+        login_attempts[identifier] = 0
+
+
+def register_failed_login(identifier: str):
+    """
+    Учитывает неудачную попытку входа.
+    """
+    login_attempts[identifier] += 1
+
+    log_info(
+        "Неудачная попытка входа",
+        username=identifier,
+        attempts=login_attempts[identifier]
+    )
+
+    if login_attempts[identifier] >= MAX_LOGIN_ATTEMPTS:
+        lockout_until[identifier] = datetime.now(timezone.utc) + timedelta(minutes=LOCKOUT_MINUTES)
+
+        log_error(
+            "Аккаунт временно заблокирован из-за обнаружения brute-force",
+            username=identifier,
+            attempts=login_attempts[identifier],
+            lock_minutes=LOCKOUT_MINUTES
+        )
+
+
+def reset_login_attempts(identifier: str):
+    """
+    Сбрасывает счетчик после успешного входа.
+    """
+    login_attempts[identifier] = 0
+
+    if identifier in lockout_until:
+        del lockout_until[identifier]
+
+    log_info(
+        "Счетчик попыток входа сброшен",
+        username=identifier
+    )
+
+
+
 # Получение текущего пользователя из JWT токена (через Authorization header)
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """
