@@ -19,8 +19,11 @@ from security import (
     get_current_patient,
     get_current_doctor,
     get_current_user,
-    get_current_admin
-    )
+    get_current_admin,
+    check_login_allowed,
+    register_failed_login,
+    reset_login_attempts
+)
 from logger import log_info, log_error
 
 
@@ -297,15 +300,26 @@ def login(data: LoginSchema):
     @returns:
         - dict с access_token, token_type, role
     """
-    ok, user = auth.login_user(data.username, data.password)
+    
+    identifier = data.username.strip().lower()
+    check_login_allowed(identifier)
+
+
+    ok, user = auth.login_user(identifier, data.password)
 
     if not ok:
+        if user != "RESET_REQUIRED":
+            register_failed_login(identifier)
+
         if user == "RESET_REQUIRED":
             raise HTTPException(
                 status_code=403,
                 detail="RESET_REQUIRED"
             )
+
         raise HTTPException(status_code=401, detail=user)
+
+    reset_login_attempts(identifier)
 
     token = create_access_token({
         "user_id": user["user_id"],
