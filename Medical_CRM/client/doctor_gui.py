@@ -39,18 +39,19 @@ def get_global_style():
     QWidget {
         background-color: #f5f7fa;
         font-family: Segoe UI, Arial;
-        font-size: 13px;
+        font-size: 14px;
         color: #2c3e50;
     }
 
     /* === LABEL === */
     QLabel {
-        font-size: 13px;
+        font-size: 14px;
     }
 
     /* === INPUT === */
     QLineEdit, QTextEdit, QComboBox {
         background-color: white;
+        font-size: 13px;
         border: 1px solid #dcdfe6;
         border-radius: 8px;
         padding: 6px 8px;
@@ -64,10 +65,29 @@ def get_global_style():
     QPushButton {
         background-color: rgba(76, 175, 80, 0.95);
         color: white;
-        border-radius: 0px;
-        padding: 0px 0px;
+        border-radius: 8px;
+        padding: 3px 8px;
         font-weight: 500;
-        border: none;
+        font-size: 12px;
+        border: 1px solid rgba(76, 175, 80, 0.95);
+        min-height: 24px;
+        min-width: 64px;
+    }
+
+    QPushButton:hover {
+        background-color: rgba(56, 142, 60, 1);
+        border: 1px solid rgba(56, 142, 60, 1);
+    }
+
+    QPushButton:pressed {
+        background-color: rgba(46, 125, 50, 1);
+        border: 1px solid rgba(46, 125, 50, 1);
+    }
+
+    QPushButton:disabled {
+        background-color: #cfcfcf;
+        color: #777;
+        border: 1px solid #cfcfcf;
     }
 
     QPushButton:hover {
@@ -87,6 +107,9 @@ def get_global_style():
     QPushButton[variant="secondary"] {
         background-color: #e4e7ed;
         color: #333;
+        border-radius: 8px;
+        padding: 3px 8px;
+        border: 1px solid #cfd3dc;
     }
 
     QPushButton[variant="secondary"]:hover {
@@ -110,6 +133,7 @@ def get_global_style():
         background-color: white;
         border: 1px solid #ebeef5;
         border-radius: 10px;
+        padding: 4px;
         gridline-color: #f0f0f0;
         selection-background-color: #e8f5e9;
     }
@@ -118,6 +142,7 @@ def get_global_style():
         background-color: #f5f7fa;
         border: none;
         padding: 6px;
+        font-size: 13px;
         font-weight: 600;
     }
 
@@ -188,7 +213,7 @@ def get_global_style():
 
 
 # Универсальная функция создания кнопок с параметрами (стиль, размер, обработчик)
-def create_button(text, *, variant=None, height=32, width=None, on_click=None):
+def create_button(text, *, variant=None, height=26, width=None, on_click=None):
     """
     @requires:
         - text — строка
@@ -213,6 +238,9 @@ def create_button(text, *, variant=None, height=32, width=None, on_click=None):
         btn.setProperty("variant", variant)
 
     btn.setMinimumHeight(height)
+    btn.setCursor(Qt.CursorShape.PointingHandCursor)
+    btn.setMinimumWidth(64)
+    btn.setContentsMargins(4, 4, 4, 4)
 
     if width:
         btn.setMaximumWidth(width)
@@ -225,11 +253,35 @@ def create_button(text, *, variant=None, height=32, width=None, on_click=None):
 
 # Диалог авторизации и регистрации пользователя (врач)
 class AuthDialog(QDialog):
+    """
+    @requires:
+        - client является экземпляром APIClient
+        - PyQt приложение инициализировано
+
+    @modifies:
+        - UI авторизации / регистрации
+
+    @effects:
+        - Создает окно входа, регистрации и восстановления пароля
+
+    @raises:
+        - Exception при ошибках UI инициализации
+
+    @returns:
+        - Экземпляр диалога авторизации
+    """
+
     def __init__(self, client: APIClient, parent=None):
         super().__init__(parent)
         self.client = client
 
         self.setWindowTitle("Авторизация")
+        self.setWindowFlags(
+            Qt.WindowType.Window |
+            Qt.WindowType.WindowMinimizeButtonHint |
+            Qt.WindowType.WindowCloseButtonHint
+        )
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.setMinimumWidth(340)
         self.setMinimumHeight(260)
         self.resize(340, 260)
@@ -296,7 +348,7 @@ class AuthDialog(QDialog):
 
         self.submit_reg = create_button(
             "Создать аккаунт",
-            height=34,
+            height=28,
             on_click=self.register
         )
 
@@ -378,6 +430,158 @@ class AuthDialog(QDialog):
             self.resize(340, 260)
 
     
+
+    # Диалог восстановления пароля после сброса администратором
+    def open_password_reset_dialog(self):
+        """
+        @requires:
+            - Пользователь получил RESET_REQUIRED
+            - self.username доступен
+
+        @modifies:
+            - Создает временный reset dialog
+
+        @effects:
+            - Открывает форму ввода нового пароля
+            - Позволяет пользователю завершить forced reset
+
+        @raises:
+            - QMessageBox при ошибках UI
+
+        @returns:
+            - None
+        """
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Восстановление пароля")
+        dialog.setMinimumWidth(340)
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+
+        info_label = QLabel(
+            "Администратор сбросил ваш пароль.\nВведите новый пароль для продолжения."
+        )
+        info_label.setWordWrap(True)
+
+        username_input = QLineEdit()
+        username_input.setPlaceholderText("Логин или Email")
+        username_input.setText(self.username.text().strip())
+
+        new_password = QLineEdit()
+        new_password.setPlaceholderText("Новый пароль")
+        new_password.setEchoMode(QLineEdit.EchoMode.Password)
+
+        confirm_password = QLineEdit()
+        confirm_password.setPlaceholderText("Подтвердите пароль")
+        confirm_password.setEchoMode(QLineEdit.EchoMode.Password)
+
+        submit_btn = create_button(
+            "Сохранить новый пароль",
+            on_click=lambda: self.reset_password_action(
+                dialog,
+                username_input,
+                new_password,
+                confirm_password
+            )
+        )
+
+        cancel_btn = create_button(
+            "Отмена",
+            variant="secondary",
+            on_click=dialog.reject
+        )
+
+        layout.addWidget(info_label)
+        layout.addWidget(username_input)
+        layout.addWidget(new_password)
+        layout.addWidget(confirm_password)
+        layout.addWidget(submit_btn)
+        layout.addWidget(cancel_btn)
+
+        dialog.setLayout(layout)
+        dialog.exec()
+
+
+    # Логика отправки нового пароля на backend
+    def reset_password_action(self, dialog, username_input, new_password, confirm_password):
+        """
+        @requires:
+            - dialog существует
+            - username введен
+            - new_password и confirm_password заполнены
+
+        @modifies:
+            - backend password_hash
+            - UI авторизации
+
+        @effects:
+            - Валидирует новый пароль
+            - Отправляет reset-password запрос
+            - Закрывает диалог при успехе
+
+        @raises:
+            - Показывает QMessageBox при ошибке
+            - Может вызвать API Exception
+
+        @returns:
+            - None
+        """
+
+        username = username_input.text().strip()
+        password1 = new_password.text()
+        password2 = confirm_password.text()
+
+        if not username:
+            QMessageBox.warning(self, "Ошибка", "Введите логин или email")
+            return
+
+        if not password1 or len(password1) < 4:
+            QMessageBox.warning(
+                self,
+                "Ошибка",
+                "Пароль должен содержать минимум 4 символа"
+            )
+            return
+
+        if password1 != password2:
+            QMessageBox.warning(self, "Ошибка", "Пароли не совпадают")
+            return
+
+        try:
+            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+            QApplication.processEvents()
+
+            # Используем уже существующий _request
+            self.client._request(
+                "POST",
+                "/auth/reset-password",
+                json={
+                    "username": username,
+                    "new_password": password1
+                }
+            )
+
+            QMessageBox.information(
+                self,
+                "Успех",
+                "Пароль успешно изменен. Теперь войдите с новым паролем."
+            )
+
+            # Автоподстановка логина
+            self.username.setText(username)
+            self.password.clear()
+
+            dialog.accept()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", str(e))
+
+        finally:
+            QApplication.restoreOverrideCursor()
+
+
 # Авторизация пользователя через API
     def login(self):
         """
@@ -399,7 +603,6 @@ class AuthDialog(QDialog):
             - None
         """
 
-
         self.login_btn.setEnabled(False)
 
         try:
@@ -419,11 +622,23 @@ class AuthDialog(QDialog):
             self.accept()
 
         except Exception as e:
-            QMessageBox.warning(self, "Ошибка", str(e))
+            # Ключевой сценарий после админского сброса
+            if "RESET_REQUIRED" in str(e):
+                QMessageBox.information(
+                    self,
+                    "Требуется новый пароль",
+                    "Ваш пароль был сброшен администратором."
+                )
+
+                self.open_password_reset_dialog()
+
+            else:
+                QMessageBox.warning(self, "Ошибка", str(e))
 
         finally:
             QApplication.restoreOverrideCursor()
             self.login_btn.setEnabled(True)
+
 
 
     # Регистрация нового врача через API
@@ -504,6 +719,25 @@ class AuthDialog(QDialog):
 
 # Главное окно приложения врача (работа с приемами и файлами)
 class DoctorApp(QWidget):
+    """
+    @requires:
+        - client авторизован
+        - APIClient доступен
+
+    @modifies:
+        - Главное окно врача
+        - UI таблиц и профиля
+
+    @effects:
+        - Управляет приемами, медкартами, файлами и профилем врача
+
+    @raises:
+        - Exception при ошибках загрузки UI
+
+    @returns:
+        - Экземпляр главного окна врача
+    """
+
     def __init__(self, client):
         super().__init__()
         self.client = client
@@ -529,14 +763,14 @@ class DoctorApp(QWidget):
             on_click=self.load_appointments
         )
         self.refresh_btn.setEnabled(False)
-        self.refresh_btn.setMinimumWidth(110)
+        self.refresh_btn.setMinimumWidth(88)
 
         self.logout_btn = create_button(
             "Завершить сеанс",
             variant="secondary",
             on_click=self.logout
         )
-        self.logout_btn.setMinimumWidth(150)
+        self.logout_btn.setMinimumWidth(118)
 
         profile_layout.addWidget(self.profile_label)
         profile_layout.addStretch()
@@ -552,8 +786,11 @@ class DoctorApp(QWidget):
         self.table.setHorizontalHeaderLabels([
             "ID", "Дата", "Пациент", "Примечание", "Вложения"
         ])
+        header = self.table.horizontalHeader()
+        header.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
         self.table.horizontalHeaderItem(4).setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         self.table.verticalHeader().setVisible(False)
+        self.table.verticalHeader().setDefaultSectionSize(46)
 
 
         # --- Динамическая ширина колонок ---
@@ -563,7 +800,7 @@ class DoctorApp(QWidget):
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)          # Пациент с растяжением поля
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
-        self.table.setColumnWidth(4, 140)
+        self.table.setColumnWidth(4, 165)
         # ----------------------------------------
 
         self.table.cellDoubleClicked.connect(self.open_record_dialog)
@@ -575,6 +812,7 @@ class DoctorApp(QWidget):
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setShowGrid(False)
+        self.table.setSortingEnabled(True)
 
         self.setLayout(layout)
 
@@ -583,6 +821,27 @@ class DoctorApp(QWidget):
 
 # Открытие файла во внешнем приложении (через временный файл)
     def open_file(self, file_id, filename):
+        """
+        @requires:
+            - file_id существует
+            - filename валиден
+            - Пользователь имеет доступ к файлу
+
+        @modifies:
+            - Создает временный файл на устройстве
+
+        @effects:
+            - Загружает файл
+            - Открывает его внешним приложением
+            - Планирует автоудаление временного файла
+
+        @raises:
+            - Показывает QMessageBox при ошибке
+
+        @returns:
+            - None
+        """
+
         try:
             file_data = self.client.download_file_with_name(file_id)
             suffix = os.path.splitext(filename)[-1] or ".tmp"
@@ -622,6 +881,27 @@ class DoctorApp(QWidget):
 
 # Сохранение файла на устройство пользователя
     def save_file(self, file_id, fallback_name):
+        """
+        @requires:
+            - file_id существует
+            - Пользователь имеет доступ
+            - fallback_name передан
+
+        @modifies:
+            - Локальную файловую систему пользователя
+
+        @effects:
+            - Загружает файл
+            - Открывает Save dialog
+            - Сохраняет файл локально
+
+        @raises:
+            - Показывает QMessageBox при ошибке
+
+        @returns:
+            - None
+        """
+
         try:
             QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
             QApplication.processEvents()
@@ -687,6 +967,23 @@ class DoctorApp(QWidget):
 
 # Открыть панель админинстратора
     def open_admin_window(self):
+        """
+        @requires:
+            - Пользователь имеет admin роль
+
+        @modifies:
+            - Создает AdminWindow
+
+        @effects:
+            - Открывает панель администратора
+
+        @raises:
+            - Exception при ошибке UI
+
+        @returns:
+            - None
+        """
+
         self.admin_window = AdminWindow(self.client)
         self.admin_window.show()
 
@@ -722,19 +1019,7 @@ class DoctorApp(QWidget):
         self.refresh_btn.setEnabled(False)
         self.table.setEnabled(False)
 
-        auth = AuthDialog(self.client, self)
-
-        if auth.exec():
-            role = getattr(self.client, "role", None)
-
-            if role == "admin":
-                self.close()
-
-                self.admin_window = AdminWindow(self.client)
-                self.admin_window.show()
-
-            else:
-                self.on_login_success()
+        self.close()
 
     
 # Загрузка списка приемов врача и отображение в таблице
@@ -760,6 +1045,8 @@ class DoctorApp(QWidget):
         """
 
         try:
+            self.table.setSortingEnabled(False)
+
             appointments = self.client.get_doctor_appointments()
 
             self.table.setRowCount(len(appointments))
@@ -799,17 +1086,27 @@ class DoctorApp(QWidget):
                 btn = create_button(
                     btn_text,
                     variant="secondary",
-                    height=28,
+                    height=22,
                     on_click=partial(self.open_files, app["id"])
                 )
 
-                # отключаем кнопку если файлов нет
+                # кнопка файлы
                 btn.setEnabled(files_count > 0)
+                btn.setMinimumHeight(22)
+                btn.setMinimumWidth(80)
+                btn.setMaximumWidth(90)
 
-                btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-                btn.setMinimumHeight(0)
-                self.table.setCellWidget(row, 4, btn)
+                # Контейнер для центрирования кнопки
+                cell_widget = QWidget()
+                cell_layout = QHBoxLayout(cell_widget)
+                cell_layout.setContentsMargins(6, 1, 6, 7)
+                cell_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+                cell_layout.addWidget(btn)
+
+                self.table.setCellWidget(row, 4, cell_widget)
                 
+                self.table.setSortingEnabled(True)
 
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", str(e))
@@ -839,23 +1136,24 @@ class DoctorApp(QWidget):
         if self.table.item(row, 0) is None:
             return
 
-        # если строка уже серая → запись есть
+        # если запись есть только просмотр
         item = self.table.item(row, 0)
-        if item.data(Qt.ItemDataRole.UserRole):
-            QMessageBox.information(self, "Инфо", "Запись уже создана")
+        if item is None:
             return
+
+        appointment_id = int(item.text())
+        has_record = item.data(Qt.ItemDataRole.UserRole)
+
+        dialog = RecordDialog(
+            self.client,
+            appointment_id,
+            readonly=bool(has_record),
+            parent=self
+        )
+
+        dialog.exec()
+        self.load_appointments()
         
-        try:
-            appointment_id = int(self.table.item(row, 0).text())
-
-            dialog = RecordDialog(self.client, appointment_id, self)
-            dialog.exec()
-
-            self.load_appointments()
-
-        except Exception as e:
-            QMessageBox.critical(self, "Ошибка", str(e))
-
     
 # Открытие списка файлов, прикрепленных к приему
     def open_files(self, appointment_id):
@@ -905,13 +1203,13 @@ class DoctorApp(QWidget):
                 btn_open = create_button(
                     "Открыть",
                     variant="secondary",
-                    height=28,
+                    height=22,
                     on_click=partial(self.open_file, f["file_id"], f["name"])
                 )
 
                 btn_download = create_button(
                     "Скачать",
-                    height=28,
+                    height=22,
                     on_click=partial(self.save_file, f["file_id"], f["name"])
                 )
 
@@ -933,9 +1231,29 @@ class DoctorApp(QWidget):
 
 # Диалог заполнения медицинской записи (диагноз, лечение, рекомендации)
 class RecordDialog(QDialog):
-    def __init__(self, client, appointment_id, parent=None):
+    """
+    @requires:
+        - client является APIClient
+        - appointment_id валиден
+
+    @modifies:
+        - UI медицинской записи
+
+    @effects:
+        - Создает окно создания / просмотра медкарты
+        - Поддерживает readonly и editable режимы
+
+    @raises:
+        - Exception при ошибке загрузки данных
+
+    @returns:
+        - Экземпляр диалога медкарты
+    """
+
+    def __init__(self, client, appointment_id, readonly=False, parent=None):
         super().__init__(parent)
         self.client = client
+        self.readonly = readonly
         self.appointment_id = appointment_id
         self.setWindowTitle("Результаты приема")
         self.setMinimumWidth(450)
@@ -976,7 +1294,7 @@ class RecordDialog(QDialog):
         time_layout.addWidget(self.next_date)
         time_layout.addWidget(self.next_time)
 
-        save_btn = create_button(
+        self.save_btn = create_button(
             "Сохранить запись",
             height=35,
             on_click=self.save
@@ -996,15 +1314,112 @@ class RecordDialog(QDialog):
         # скрыть по умолчанию
         self.next_visit_row_label.setVisible(False)
         self.next_visit_container.setVisible(False)
-        layout.addRow(save_btn)
+        layout.addRow(self.save_btn)
 
         self.enable_next_visit.stateChanged.connect(self.toggle_next_visit)
+
+        if self.readonly:
+            self.load_record()
+            self.set_readonly_mode()
+
 
         self.setLayout(layout)
 
 
+
+# Режим только просмотра
+    def set_readonly_mode(self):
+        """
+        @requires:
+            - Диалог и поля инициализированы
+
+        @modifies:
+            - UI полей
+            - save_btn
+
+        @effects:
+            - Блокирует редактирование
+            - Переводит окно в режим просмотра
+            - Меняет кнопку на "Закрыть"
+
+        @raises:
+            - TypeError при disconnect (обрабатывается)
+
+        @returns:
+            - None
+        """
+
+        self.diagnosis.setReadOnly(True)
+        self.medication.setReadOnly(True)
+        self.recommendations.setReadOnly(True)
+
+        self.enable_next_visit.setEnabled(False)
+        self.next_date.setEnabled(False)
+        self.next_time.setEnabled(False)
+
+        self.save_btn.setEnabled(True)
+        self.save_btn.setText("Закрыть")
+
+        try:
+            self.save_btn.clicked.disconnect()
+        except TypeError:
+            pass
+
+        self.save_btn.clicked.connect(self.accept)
+
+
+# Загрузка данных для режима просмотра
+    def load_record(self):
+        """
+        @requires:
+            - appointment_id существует
+            - API endpoint get_record доступен
+
+        @modifies:
+            - diagnosis
+            - medication
+            - recommendations
+
+        @effects:
+            - Загружает существующую медкарту в readonly режим
+
+        @raises:
+            - Показывает QMessageBox при ошибке API
+
+        @returns:
+            - None
+        """
+
+        try:
+            data = self.client.get_record(self.appointment_id)
+
+            self.diagnosis.setText(data.get("diagnosis") or "")
+            self.medication.setText(data.get("medication") or "")
+            self.recommendations.setText(data.get("recommendations") or "")
+
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", str(e))
+            self.close()
+
+
 # Включение/отключение блока назначения повторного приема
     def toggle_next_visit(self, state):
+        """
+        @requires:
+            - state передан QCheckBox
+
+        @modifies:
+            - Видимость блока next_visit
+
+        @effects:
+            - Показывает или скрывает поля повторного приема
+
+        @raises:
+            - Ничего
+
+        @returns:
+            - None
+        """
         enabled = bool(state)
         self.next_visit_row_label.setVisible(enabled)
         self.next_visit_container.setVisible(enabled)
@@ -1072,6 +1487,25 @@ class RecordDialog(QDialog):
 
 # Диалог панели администратора
 class AdminWindow(QWidget):
+    """
+    @requires:
+        - client авторизован как admin
+
+    @modifies:
+        - UI панели администратора
+
+    @effects:
+        - Управляет поиском пользователей
+        - Позволяет удалять записи/файлы
+        - Поддерживает reset password
+
+    @raises:
+        - Exception при ошибке инициализации
+
+    @returns:
+        - Экземпляр AdminWindow
+    """
+
     def __init__(self, client):
         super().__init__()
         self.client = client
@@ -1088,7 +1522,7 @@ class AdminWindow(QWidget):
         top_bar = QHBoxLayout()
 
         self.logout_btn = create_button(
-            "Выйти",
+            "Завершить сеанс",
             variant="secondary",
             on_click=self.logout
         )
@@ -1098,8 +1532,6 @@ class AdminWindow(QWidget):
 
         layout.addLayout(top_bar)
         
-
-
 
         del_layout = QFormLayout()
         self.table_combo = QComboBox()
@@ -1139,10 +1571,11 @@ class AdminWindow(QWidget):
         self.search_btn = create_button("Поиск", on_click=self.search)
 
         self.results_table = QTableWidget()
-        self.results_table.verticalHeader().setDefaultSectionSize(36)
+        self.results_table.verticalHeader().setDefaultSectionSize(46)
         self.results_table.setColumnCount(5)
         self.results_table.setHorizontalHeaderLabels(["ID", "Логин", "Имя", "Роль", ""])
         self.results_table.setEnabled(True)
+        self.results_table.setSortingEnabled(True)
 
         header = self.results_table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
@@ -1150,7 +1583,7 @@ class AdminWindow(QWidget):
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
-        self.results_table.setColumnWidth(4, 120)
+        self.results_table.setColumnWidth(4, 145)
         
 
 
@@ -1166,8 +1599,27 @@ class AdminWindow(QWidget):
 
     # Выход из аккаунта
     def logout(self):
-            self.client.logout()
-            self.close()
+        """
+        @requires:
+            - Пользователь авторизован
+
+        @modifies:
+            - client session
+            - UI
+
+        @effects:
+            - Завершает admin session
+            - Закрывает окно
+
+        @raises:
+            - Ничего
+
+        @returns:
+            - None
+        """
+            
+        self.client.logout()
+        self.close()
 
 
 # Поиск по пользователям для выполнения действий с ними
@@ -1191,6 +1643,8 @@ class AdminWindow(QWidget):
         """
 
         try:
+            self.results_table.setSortingEnabled(False)
+
             data = self.client.admin_search(self.search_input.text())
 
             self.results_table.setRowCount(len(data))
@@ -1198,46 +1652,58 @@ class AdminWindow(QWidget):
             for row, item in enumerate(data):
                 self.results_table.setItem(row, 0, QTableWidgetItem(str(item["id"])))
                 self.results_table.setItem(row, 1, QTableWidgetItem(item["username"]))
+
                 name = f"{item.get('last_name') or ''} {item.get('first_name') or ''}".strip()
                 self.results_table.setItem(row, 2, QTableWidgetItem(name))
                 self.results_table.setItem(row, 3, QTableWidgetItem(item["role"]))
 
                 btn = create_button(
                     "Сброс",
-                    height=28,
+                    height=22,
                     on_click=partial(self.open_reset_dialog, item["id"])
                 )
 
-                # стиль для красной кнопки - уникальный
+                # Красная кнопка сброса
                 btn.setStyleSheet("""
                     QPushButton {
                         background-color: #d64545;
                         color: white;
-                        border-radius: 0px;
-                        padding: 0px 0px;
+                        border-radius: 8px;
+                        padding: 3px 10px;
+                        margin: 0px;
                     }
+
                     QPushButton:hover {
                         background-color: #b83a3a;
                     }
+
+                    QPushButton:pressed {
+                        background-color: #9f2f2f;
+                    }
                 """)
 
-            btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-            btn.setMinimumHeight(0)
+                btn.setSizePolicy(
+                    QSizePolicy.Policy.Expanding,
+                    QSizePolicy.Policy.Expanding
+                )
 
-            btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #d64545;
-                    color: white;
-                    border-radius: 6px;
-                    padding: 0px;
-                }
-                QPushButton:hover {
-                    background-color: #b83a3a;
-                }
-            """)
 
-            self.results_table.setCellWidget(row, 4, btn)
+                btn.setMinimumHeight(22)
+                btn.setMinimumWidth(88)
+                btn.setMaximumWidth(110)
 
+                cell_widget = QWidget()
+                cell_layout = QHBoxLayout(cell_widget)
+
+                cell_layout.setContentsMargins(6, 1, 6, 7)
+                cell_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+                cell_layout.addWidget(btn)
+
+                self.results_table.setCellWidget(row, 4, cell_widget)
+
+
+                self.results_table.setSortingEnabled(True)
 
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", str(e))
@@ -1245,6 +1711,23 @@ class AdminWindow(QWidget):
 
 # Вызов окна 
     def open_reset_dialog(self, user_id):
+        """
+        @requires:
+            - user_id валиден
+
+        @modifies:
+            - Создает reset dialog
+
+        @effects:
+            - Показывает окно подтверждения сброса пароля
+
+        @raises:
+            - Exception при ошибке UI
+
+        @returns:
+            - None
+        """
+
         dialog = QDialog(self)
         dialog.setWindowTitle("Сброс пароля")
         dialog.setMinimumWidth(300)
@@ -1266,6 +1749,25 @@ class AdminWindow(QWidget):
 
 # логика сброса пароля для пользователей
     def confirm_reset(self, user_id, dialog):
+        """
+        @requires:
+            - user_id существует
+            - dialog активен
+
+        @modifies:
+            - backend password_hash пользователя
+
+        @effects:
+            - Выполняет admin reset password
+            - Закрывает окно подтверждения
+
+        @raises:
+            - Показывает QMessageBox при ошибке API
+
+        @returns:
+            - None
+        """
+
         try:
             self.client.admin_reset_password(user_id)
 
@@ -1371,24 +1873,33 @@ def main():
 
     client = APIClient()
 
+    current_window = None
+
     while True:
         auth = AuthDialog(client)
 
+        # Если окно авторизации закрыли → полный выход
         if auth.exec() != QDialog.DialogCode.Accepted:
             break
 
         role = getattr(client, "role", None)
 
+        # Создаем нужное окно
         if role == "admin":
-            window = AdminWindow(client)
+            current_window = AdminWindow(client)
         else:
-            window = DoctorApp(client)
+            current_window = DoctorApp(client)
 
-        window.show()
+        # Показываем окно
+        current_window.show()
+
+        # Запуск локального цикла окна
         app.exec()
 
-    sys.exit()
+        # После logout возвращаемся обратно в auth
+        current_window = None
 
+    sys.exit()
 
 if __name__ == "__main__":
     main()
