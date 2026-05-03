@@ -136,6 +136,25 @@ app.add_middleware(
 
 # Схема данных для регистрации пользователя (пациент или врач)
 class UserRegisterSchema(BaseModel):
+    """
+    @requires:
+        - Входные данные регистрации соответствуют структуре Pydantic
+        - role передается как строка
+        - email валиден по EmailStr
+
+    @modifies:
+        - Ничего
+
+    @effects:
+        - Валидирует структуру регистрации пользователя
+        - Запрещает лишние поля (extra=forbid)
+
+    @raises:
+        - ValidationError при некорректных данных
+
+    @returns:
+        - Объект схемы регистрации пользователя
+    """
     model_config = {
         "extra": "forbid"
     }
@@ -155,6 +174,23 @@ class UserRegisterSchema(BaseModel):
 
 # Схема данных для авторизации пользователя (логин + пароль)
 class LoginSchema(BaseModel):
+    """
+    @requires:
+        - username и password переданы
+
+    @modifies:
+        - Ничего
+
+    @effects:
+        - Валидирует структуру запроса авторизации
+        - Запрещает лишние поля
+
+    @raises:
+        - ValidationError при ошибке структуры
+
+    @returns:
+        - Объект схемы логина
+    """
     model_config = {"extra": "forbid"}
 
     username: str
@@ -163,6 +199,24 @@ class LoginSchema(BaseModel):
 
 # Схема данных для создания записи на прием
 class AppointmentSchema(BaseModel):
+    """
+    @requires:
+        - doctor_id валиден
+        - datetime передан в ISO формате или datetime
+        - note опционален
+
+    @modifies:
+        - Ничего
+
+    @effects:
+        - Валидирует данные создания записи на прием
+
+    @raises:
+        - ValidationError при ошибке структуры
+
+    @returns:
+        - Объект схемы записи на прием
+    """
     model_config = {"extra": "forbid"}
 
     doctor_id: int
@@ -172,6 +226,25 @@ class AppointmentSchema(BaseModel):
 
 # Схема медицинской записи врача (результаты приема и планирование следующего визита)
 class RecordSchema(BaseModel):
+    """
+    @requires:
+        - appointment_id существует
+        - visit_datetime валиден
+        - next_visit опционален
+
+    @modifies:
+        - Ничего
+
+    @effects:
+        - Валидирует структуру медицинской записи
+
+    @raises:
+        - ValidationError при ошибке структуры
+
+    @returns:
+        - Объект схемы медицинской записи
+    """
+
     model_config = {"extra": "forbid"}
 
     appointment_id: int
@@ -183,7 +256,7 @@ class RecordSchema(BaseModel):
 
 
 # Аутентификация
-# Регистрация нового пользователя (пациент / врач)
+# Регистрация нового пользователя (пациент/врач)
 @app.post("/register")
 def register(data: UserRegisterSchema):
     """
@@ -208,6 +281,9 @@ def register(data: UserRegisterSchema):
     """
 
     try:
+        if data.role not in ["patient", "doctor"]:
+            raise HTTPException(status_code=400, detail="Недопустимая роль")
+
         ok, result = auth.register_user(
                 username=data.username,
                 email=data.email,
@@ -238,44 +314,6 @@ def register(data: UserRegisterSchema):
         "status": "success",
         "user_id": result["user_id"]
     }
-
-
-# Сброс пароля для пользователей из панели администратора
-@app.post("/admin/reset-password/{user_id}")
-def admin_reset_password(user_id: int, admin=Depends(get_current_admin)):
-    """
-    @requires:
-        - Пользователь авторизован как admin
-        - user_id существует в системе
-
-    @modifies:
-        - Таблица users (password_hash = NULL)
-
-    @effects:
-        - Делает пароль пользователя недействительным
-        - Требует установки нового пароля
-
-    @raises:
-        - HTTPException(404) если пользователь не найден
-        - HTTPException(403) если нет прав администратора
-
-    @returns:
-        - dict со статусом reset_required
-    """
-
-
-    with get_db_cursor() as cur:
-        cur.execute("""
-            UPDATE users
-            SET password_hash = NULL
-            WHERE id = %s
-            RETURNING id
-        """, (user_id,))
-
-        if not cur.fetchone():
-            raise HTTPException(404, "Пользователь не найден")
-
-    return {"status": "reset_required"}
 
 
 # Авторизация пользователя и выдача JWT токена
@@ -336,7 +374,61 @@ def login(data: LoginSchema):
     }
 
 
+# Сброс пароля для пользователей из панели администратора
+@app.post("/admin/reset-password/{user_id}")
+def admin_reset_password(user_id: int, admin=Depends(get_current_admin)):
+    """
+    @requires:
+        - Пользователь авторизован как admin
+        - user_id существует в системе
+
+    @modifies:
+        - Таблица users (password_hash = NULL)
+
+    @effects:
+        - Делает пароль пользователя недействительным
+        - Требует установки нового пароля
+
+    @raises:
+        - HTTPException(404) если пользователь не найден
+        - HTTPException(403) если нет прав администратора
+
+    @returns:
+        - dict со статусом reset_required
+    """
+
+
+    with get_db_cursor() as cur:
+        cur.execute("""
+            UPDATE users
+            SET password_hash = NULL
+            WHERE id = %s
+            RETURNING id
+        """, (user_id,))
+
+        if not cur.fetchone():
+            raise HTTPException(404, "Пользователь не найден")
+
+    return {"status": "reset_required"}
+
+
 class PasswordSchema(BaseModel):
+    """
+    @requires:
+        - new_password передан
+
+    @modifies:
+        - Ничего
+
+    @effects:
+        - Валидирует структуру установки нового пароля
+
+    @raises:
+        - ValidationError при ошибке структуры
+
+    @returns:
+        - Объект схемы нового пароля
+    """
     model_config = {"extra": "forbid"}
 
     new_password: str
@@ -396,7 +488,25 @@ def set_password(
 
     return {"status": "password_set"}
 
+
 class ResetPasswordSchema(BaseModel):
+    """
+    @requires:
+        - username существует
+        - new_password передан
+
+    @modifies:
+        - Ничего
+
+    @effects:
+        - Валидирует frontend reset password запрос
+
+    @raises:
+        - ValidationError при ошибке структуры
+
+    @returns:
+        - Объект схемы frontend reset
+    """
     model_config = {"extra": "forbid"}
     
     username: str
@@ -406,6 +516,27 @@ class ResetPasswordSchema(BaseModel):
 # Эндпоинт восстановления пароля из front
 @app.post("/auth/reset-password")
 def frontend_reset_password(data: ResetPasswordSchema):
+    """
+    @requires:
+        - username/email существует
+        - Пароль пользователя ранее сброшен администратором
+        - new_password >= 4 символов
+
+    @modifies:
+        - Таблица users (обновляет password_hash)
+
+    @effects:
+        - Проверяет право на восстановление
+        - Устанавливает новый пароль через frontend flow
+
+    @raises:
+        - HTTPException(400) если пароль короткий
+        - HTTPException(404) если пользователь не найден
+        - HTTPException(400) если reset не был инициирован
+
+    @returns:
+        - dict со статусом password_set
+    """
 
     if not data.new_password or len(data.new_password) < 4:
         raise HTTPException(
@@ -465,8 +596,64 @@ def get_specialties():
     """
 
     with get_db_cursor() as cur:
-        cur.execute("SELECT id, name FROM specialties")
+        cur.execute("SELECT id, name FROM specialties LIMIT 100")
         return cur.fetchall()
+
+
+# Получение данных текущего пользователя (врач/пациент)
+@app.get("/me")
+def get_me(user=Depends(get_current_user)):
+
+    """
+    @requires:
+        - Пользователь авторизован
+        - role корректна (doctor/patient/admin)
+
+    @modifies:
+        - Ничего
+
+    @effects:
+        - Возвращает базовый профиль текущего пользователя
+
+    @raises:
+        - HTTPException(403) при неверной роли
+        - HTTPException(404) если профиль не найден
+
+    @returns:
+        - dict с first_name / last_name
+    """
+
+    with get_db_cursor() as cur:
+
+        if user["role"] == "doctor":
+            cur.execute("""
+                SELECT first_name, last_name
+                FROM employees
+                WHERE user_id = %s
+            """, (user["user_id"],))
+
+        elif user["role"] == "patient":
+            cur.execute("""
+                SELECT first_name, last_name
+                FROM patients
+                WHERE user_id = %s
+            """, (user["user_id"],))
+
+        elif user["role"] == "admin":
+            return {
+                "first_name": "Администратор",
+                "last_name": user["username"]
+            }
+
+        else:
+            raise HTTPException(403, "Недопустимая роль")
+
+        user_data = cur.fetchone()
+
+        if not user_data:
+            raise HTTPException(404, "Пользователь не найден")
+
+        return user_data
 
 
 # Получение списка врачей по специальности
@@ -501,7 +688,11 @@ def get_doctors(specialty_id: int):
 
 # Получение списка записей пациента к врачам
 @app.get("/patient/appointments")
-def get_patient_appointments(patient_id: int = Depends(get_current_patient)):
+def get_patient_appointments(
+    limit: int = 50,
+    offset: int = 0,
+    patient_id: int = Depends(get_current_patient)
+):
     """
     @requires:
         - Пользователь авторизован как пациент
@@ -532,7 +723,8 @@ def get_patient_appointments(patient_id: int = Depends(get_current_patient)):
             JOIN employees e ON a.doctor_id = e.id
             WHERE a.patient_id = %s
             ORDER BY a.appointment_datetime
-        """, (patient_id,))
+            LIMIT %s OFFSET %s
+        """, (patient_id, limit, offset))
         return cur.fetchall()
 
 
@@ -543,8 +735,36 @@ def get_doctor_appointments(
     date_to: Optional[datetime] = None,
     search: Optional[str] = None,
     status: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
     doctor_id: int = Depends(get_current_doctor)
-):
+):    
+    """
+    @requires:
+        - Пользователь авторизован как врач
+        - doctor_id валиден
+        - date/search/status опционально корректны
+
+    @modifies:
+        - Ничего
+
+    @effects:
+        - Возвращает список приемов врача
+        - Поддерживает фильтрацию:
+            * диапазон дат
+            * поиск пациента
+            * done/pending
+        - Добавляет has_record и patient_name
+
+    @raises:
+        - HTTPException(403) при отсутствии роли врача
+        - Exception при ошибке БД
+
+    @returns:
+        - list словарей приемов
+    """
+    
+    
     query = """
         SELECT 
             a.id,
@@ -590,7 +810,8 @@ def get_doctor_appointments(
     elif status == "pending":
         query += " AND m.id IS NULL"
 
-    query += " ORDER BY a.appointment_datetime"
+    query += " ORDER BY a.appointment_datetime LIMIT %s OFFSET %s"
+    params.extend([limit, offset])
 
     with get_db_cursor() as cur:
         cur.execute(query, tuple(params))
@@ -603,47 +824,31 @@ def get_doctor_appointments(
     return rows
 
 
-# Получение данных текущего пользователя (врач / пациент)
-@app.get("/me")
-def get_me(user=Depends(get_current_user)):
-    with get_db_cursor() as cur:
-
-        if user["role"] == "doctor":
-            cur.execute("""
-                SELECT first_name, last_name
-                FROM employees
-                WHERE user_id = %s
-            """, (user["user_id"],))
-
-            '''
-            elif user["role"] == "patient":
-                cur.execute("""
-                    SELECT first_name, last_name
-                    FROM patients
-                    WHERE user_id = %s
-                """, (user["user_id"],))
-            '''
-
-        elif user["role"] == "admin":
-            return {
-                "first_name": "Администратор",
-                "last_name": user["username"]
-            }
-
-        else:
-            raise HTTPException(403, "Недопустимая роль")
-
-        user_data = cur.fetchone()
-
-        if not user_data:
-            raise HTTPException(404, "Пользователь не найден")
-
-        return user_data
-    
-
 # Поиск по ФИО для панели админа
 @app.get("/admin/search")
 def admin_search(q: str, admin_id: int = Depends(get_current_admin)):
+    """
+    @requires:
+        - Пользователь авторизован как admin
+        - q >= 2 символов
+
+    @modifies:
+        - Ничего
+
+    @effects:
+        - Выполняет поиск пользователей по:
+            * username
+            * имени
+            * фамилии
+
+    @raises:
+        - HTTPException(400) если запрос слишком короткий
+        - HTTPException(403) если нет прав
+
+    @returns:
+        - list найденных пользователей
+    """
+
     q = q.strip()
 
     if len(q) < 2:
@@ -700,7 +905,10 @@ def core_create_appointment(cur, doctor_id: int, patient_id: int, dt: datetime, 
     """
 
     if dt.tzinfo is None:
-        raise HTTPException(400, "Datetime must include timezone")
+    # если отсутствует, то пришло локальное время - делаем UTC
+        dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt = dt.astimezone(timezone.utc)
 
     dt = dt.astimezone(timezone.utc)
 
@@ -728,7 +936,7 @@ def core_create_appointment(cur, doctor_id: int, patient_id: int, dt: datetime, 
     try:
         cur.execute("""
             INSERT INTO appointments
-            (patient_id, doctor_id, appointment_datetime, complaint)
+            (patient_id, doctor_id, appointment_datetime, note)
             VALUES (%s, %s, %s, %s)
             RETURNING id
         """, (
@@ -750,6 +958,26 @@ def core_create_appointment(cur, doctor_id: int, patient_id: int, dt: datetime, 
 # Эндпоинт для пациента
 @app.post("/appointments")
 def create_appointment(data: AppointmentSchema, patient_id: int = Depends(get_current_patient)):
+    """
+    @requires:
+        - Пользователь авторизован как пациент
+        - doctor_id валиден
+        - datetime валиден
+
+    @modifies:
+        - Таблица appointments
+
+    @effects:
+        - Создает запись пациента на прием
+
+    @raises:
+        - HTTPException(400) при ошибке времени/слота
+        - HTTPException(403) при отсутствии доступа
+
+    @returns:
+        - dict с appointment_id
+    """
+
     with get_db_cursor() as cur:
         new_id = core_create_appointment(
             cur, data.doctor_id, patient_id, data.datetime, data.note
@@ -764,6 +992,30 @@ def create_appointment(data: AppointmentSchema, patient_id: int = Depends(get_cu
 # Эндпоинт для врача
 @app.post("/medical-record")
 def create_record(data: RecordSchema, doctor_id: int = Depends(get_current_doctor)):
+    """
+    @requires:
+        - Пользователь авторизован как врач
+        - appointment_id принадлежит врачу
+        - Данные записи валидны
+
+    @modifies:
+        - Таблица medical_records
+        - Таблица appointments (если создается next_visit)
+
+    @effects:
+        - Создает медицинскую запись
+        - Может создать повторный прием
+        - Блокирует повторную запись на тот же прием
+
+    @raises:
+        - HTTPException(404) если прием не найден
+        - HTTPException(400) если запись уже существует
+        - HTTPException(400) при ошибке next_visit
+
+    @returns:
+        - dict со статусом success и состоянием next_visit
+    """
+
     with get_db_cursor() as cur:
         # Получаем данные пациента из текущего приема
         cur.execute(
@@ -813,7 +1065,7 @@ def create_record(data: RecordSchema, doctor_id: int = Depends(get_current_docto
             (appointment_id, doctor_id, patient_id, visit_datetime, 
              next_visit_datetime, diagnosis, medication, recommendations)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            ON CONFLICT (appointment_id) DO UPDATE SET
+            ON CONFLICT (appointment_id) DO NOTHING
                 diagnosis = EXCLUDED.diagnosis,
                 medication = EXCLUDED.medication,
                 recommendations = EXCLUDED.recommendations,
@@ -824,6 +1076,12 @@ def create_record(data: RecordSchema, doctor_id: int = Depends(get_current_docto
             data.next_visit, data.diagnosis, data.medication, data.recommendations
         ))
 
+        if cur.rowcount == 0:
+            raise HTTPException(
+                400,
+                "Медицинская запись для этого приема уже существует"
+    )
+
         return {
         "status": "success",
         "next_visit": next_visit_status
@@ -833,6 +1091,24 @@ def create_record(data: RecordSchema, doctor_id: int = Depends(get_current_docto
 # Получение медицинских записей пациента
 @app.get("/patient/records")
 def get_patient_records(patient_id: int = Depends(get_current_patient)):
+    """
+    @requires:
+        - Пользователь авторизован как пациент
+
+    @modifies:
+        - Ничего
+
+    @effects:
+        - Возвращает историю медицинских записей пациента
+
+    @raises:
+        - HTTPException(403) при отсутствии доступа
+        - Exception при ошибке БД
+
+    @returns:
+        - list медицинских записей
+    """
+
     with get_db_cursor() as cur:
         cur.execute("""
             SELECT 
@@ -902,6 +1178,57 @@ def check_appointment_access(cur, appointment_id, user):
         raise HTTPException(403, "Нет доступа")
     
 
+# Получение медицинской записи по конкретному приему (для врача / админа)
+@app.get("/medical-record/{appointment_id}")
+def get_medical_record(
+    appointment_id: int,
+    user=Depends(get_current_user)
+):
+    """
+    @requires:
+        - Пользователь авторизован
+        - appointment_id существует
+        - Есть доступ к приему
+
+    @modifies:
+        - Ничего
+
+    @effects:
+        - Возвращает медицинскую запись по конкретному приему
+
+    @raises:
+        - HTTPException(403) если нет доступа
+        - HTTPException(404) если запись не найдена
+
+    @returns:
+        - dict медицинской записи
+    """
+
+    with get_db_cursor() as cur:
+
+        # Проверка доступа к приему
+        check_appointment_access(cur, appointment_id, user)
+
+        cur.execute("""
+            SELECT
+                appointment_id,
+                diagnosis,
+                medication,
+                recommendations,
+                visit_datetime,
+                next_visit_datetime
+            FROM medical_records
+            WHERE appointment_id = %s
+        """, (appointment_id,))
+
+        record = cur.fetchone()
+
+        if not record:
+            raise HTTPException(404, "Медицинская запись не найдена")
+
+        return record
+
+
 
 
 # Загрузка файла (анализы, документы) к приему
@@ -945,7 +1272,11 @@ def upload_file(
         raise HTTPException(400, "Недопустимое расширение файла")
 
     # 3. Читаем синхронно через встроенный SpooledTemporaryFile
-    content = file.file.read()
+    MAX_SIZE = 8 * 1024 * 1024  # 8MB
+    content = file.file.read(MAX_SIZE + 1)
+
+    if len(content) > MAX_SIZE:
+        raise HTTPException(400, "Файл слишком большой (макс 8MB)")
 
     # 4. Проверка пустого файла
     if not content:
@@ -958,14 +1289,10 @@ def upload_file(
     if filename.endswith((".jpg", ".jpeg")) and not content.startswith(b"\xff\xd8"):
         raise HTTPException(400, "Файл поврежден или не является JPEG")
 
-    # 6. Проверка размера (8 MB)
-    if len(content) > 8 * 1024 * 1024:
-        raise HTTPException(400, "Файл слишком большой (макс 8MB)")
-
-    # 7. Мини-очистка имени файла
+    # 6. Мини-очистка имени файла
     safe_filename = os.path.basename(filename).replace("/", "_").replace("\\", "_")
 
-    # 8. Разделяем транзакции для безопасной обработки ошибок
+    # 7. Разделяем транзакции для безопасной обработки ошибок
     with get_db_cursor() as cur:
         uploader_id = check_appointment_access(cur, appointment_id, user)
 
@@ -1068,6 +1395,26 @@ def get_files_by_appointment(
     appointment_id: int,
     user=Depends(get_current_user)
 ):
+    """
+    @requires:
+        - Пользователь авторизован
+        - appointment_id существует
+
+    @modifies:
+        - Ничего
+
+    @effects:
+        - Проверяет доступ
+        - Возвращает список файлов приема
+
+    @raises:
+        - HTTPException(404) если прием не найден
+        - HTTPException(403) если нет доступа
+
+    @returns:
+        - list файлов
+    """
+
     with get_db_cursor() as cur:
         cur.execute("""
             SELECT patient_id, doctor_id FROM appointments
@@ -1099,6 +1446,28 @@ def admin_delete_record(
     full_delete: bool = False,
     admin_id: int = Depends(get_current_admin)
 ):
+    """
+    @requires:
+        - Пользователь авторизован как admin
+        - table входит в whitelist
+        - record_id > 0
+
+    @modifies:
+        - PostgreSQL записи
+        - GridFS файлы (при необходимости)
+
+    @effects:
+        - Удаляет запись
+        - Может выполнять каскадное удаление связанных файлов
+
+    @raises:
+        - HTTPException(400) при неверной таблице/ID
+        - HTTPException(403) при отсутствии прав
+
+    @returns:
+        - dict со статусом deleted
+    """
+
     # whitelist таблиц — ВСЕГДА проверяется
     allowed_tables = {
         "users", "patients", "employees",
@@ -1189,6 +1558,23 @@ def admin_delete_record(
 # Проверка работоспособности API
 @app.get("/health")
 def health_check():
+    """
+    @requires:
+        - Сервер запущен
+
+    @modifies:
+        - Логи системы
+
+    @effects:
+        - Проверяет доступность API
+
+    @raises:
+        - Ничего
+
+    @returns:
+        - dict со статусом online
+    """
+
     log_info("Health check")
     return {"status": "online"}
 
