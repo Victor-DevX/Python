@@ -19,6 +19,22 @@ DB_CONFIG = {
     "port": os.getenv("DB_PORT"),
 }
 
+"""
+@requires:
+    - Переменные окружения DB_NAME, DB_USER, DB_PASS, DB_HOST, DB_PORT заданы
+
+@modifies:
+    - Ничего
+
+@effects:
+    - Формирует конфигурацию подключения PostgreSQL
+
+@raises:
+    - RuntimeError позже, если конфигурация неполная
+
+@returns:
+    - dict параметров подключения PostgreSQL
+"""
 
 # Проверка наличия всех параметров подключения к БД
 if not all(DB_CONFIG.values()):
@@ -29,44 +45,116 @@ if not all(DB_CONFIG.values()):
 MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
 
 client = MongoClient(MONGO_URL)
+"""
+@requires:
+    - MONGO_URL валиден
+    - MongoDB доступен
+
+@modifies:
+    - Создает MongoDB client connection
+
+@effects:
+    - Инициализирует подключение к MongoDB
+
+@raises:
+    - Exception при ошибке подключения
+
+@returns:
+    - MongoClient instance
+"""
+
+
 db = client["medical_crm"]
+"""
+@requires:
+    - MongoClient инициализирован
+
+@modifies:
+    - Ничего
+
+@effects:
+    - Предоставляет доступ к MongoDB database medical_crm
+
+@raises:
+    - Exception при ошибке доступа
+
+@returns:
+    - MongoDB database object
+"""
+
+
 fs = gridfs.GridFS(db)
+"""
+@requires:
+    - MongoDB database доступна
+
+@modifies:
+    - Ничего
+
+@effects:
+    - Инициализирует GridFS для хранения файлов
+
+@raises:
+    - Exception при ошибке GridFS
+
+@returns:
+    - GridFS instance
+"""
 
 
 # Пул соединений PostgreSQL (оптимизация производительности и повторное использование соединений)
 # Создаем пул соединений (мин 1, макс 10)
 # ThreadedConnectionPool важен для FastAPI, так как он работает в многопоточном режиме
 pool = ThreadedConnectionPool(1, 10, **DB_CONFIG)
+"""
+@requires:
+    - DB_CONFIG полный
+    - PostgreSQL доступен
+
+@modifies:
+    - Создает пул соединений PostgreSQL
+
+@effects:
+    - Управляет многопоточными подключениями
+    - Оптимизирует повторное использование соединений
+
+@raises:
+    - Exception при ошибке подключения к PostgreSQL
+
+@returns:
+    - ThreadedConnectionPool instance
+"""
+
 
 @contextmanager
 def get_db_cursor():
     """
     @requires:
-        - Пул соединений pool инициализирован
+        - pool инициализирован
         - PostgreSQL доступен
-        - DB_CONFIG корректно задан
-        - psycopg2 подключен
+        - Соединение может быть получено из пула
 
     @modifies:
-        - Использует соединение из пула (временно)
-        - Может изменять состояние БД (в зависимости от выполняемых запросов)
-        - Выполняет commit или rollback транзакции
+        - Выделяет и возвращает соединение из пула
+        - Выполняет commit/rollback
+        - Логи системы
 
     @effects:
-        - Предоставляет курсор с RealDictCursor (результаты в виде dict)
-        - Автоматически управляет транзакцией:
+        - Предоставляет RealDictCursor
+        - Автоматически:
             * commit при успехе
             * rollback при ошибке
-        - Возвращает соединение обратно в пул
+            * возврат соединения в пул
 
     @raises:
-        - Exception при ошибках SQL-запросов
-        - Exception при проблемах с соединением
-        - RuntimeError если пул соединений не работает
+        - Exception при SQL ошибках
+        - Exception при ошибках соединения
+        - RuntimeError при неработающем пуле
 
     @returns:
-        - cursor (RealDictCursor) через yield
+        - RealDictCursor через yield
     """
+    
     conn = pool.getconn()
     try:
         # cursor_factory=RealDictCursor превращает кортежи в словари
