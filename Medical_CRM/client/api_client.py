@@ -26,7 +26,6 @@ def to_utc_iso(dt: datetime):
     """
     return dt.astimezone(timezone.utc).replace(second=0, microsecond=0).isoformat()
 
-
 # Клиент для взаимодействия с backend API (HTTP-запросы, авторизация, данные)
 class APIClient:
     def __init__(self, base_url="http://127.0.0.1:8000"):
@@ -232,11 +231,43 @@ class APIClient:
 
 # Получение списка медицинских специальностей
     def get_specialties(self):
+        """
+        @requires:
+            - backend доступен
+
+        @modifies:
+            - Ничего
+
+        @effects:
+            - Получает список медицинских специальностей
+
+        @raises:
+            - Exception при ошибке API
+
+        @returns:
+            - list словарей специальностей
+        """
         return self._request("GET", "/specialties")
 
 
 # Получение списка врачей по специальности
     def get_doctors(self, specialty_id: int):
+        """
+        @requires:
+            - specialty_id валиден
+
+        @modifies:
+            - Ничего
+
+        @effects:
+            - Получает список врачей по специальности
+
+        @raises:
+            - Exception при ошибке API
+
+        @returns:
+            - list врачей
+        """
         return self._request(
             "GET",
             "/doctors",
@@ -321,12 +352,45 @@ class APIClient:
 
 # Подготовка списка специальностей для отображения в интерфейсе
     def get_specialties_for_ui(self):
+        """
+        @requires:
+            - backend доступен
+
+        @modifies:
+            - Ничего
+
+        @effects:
+            - Преобразует список специальностей в формат для UI
+            - (name, id)
+
+        @raises:
+            - Exception при ошибке API
+
+        @returns:
+            - list кортежей (name, id)
+        """
         data = self.get_specialties()
         return [(s["name"], s["id"]) for s in data]
     
 
 # Получение списка записей текущего пациента
     def get_my_appointments(self):
+        """
+        @requires:
+            - пользователь авторизован
+
+        @modifies:
+            - Ничего
+
+        @effects:
+            - Получает список приемов текущего пациента
+
+        @raises:
+            - Exception при ошибке API
+
+        @returns:
+            - list приемов
+        """
         return self._request("GET", "/patient/appointments")
 
 
@@ -367,6 +431,24 @@ class APIClient:
 
 # Получение и форматирование списка файлов для UI
     def get_files_for_ui(self, appointment_id: int):
+        """
+        @requires:
+            - appointment_id валиден
+            - пользователь имеет доступ
+
+        @modifies:
+            - Ничего
+
+        @effects:
+            - Получает список файлов
+            - Преобразует их в формат UI
+
+        @raises:
+            - Exception при ошибке API
+
+        @returns:
+            - list словарей {id, file_id, name}
+        """
         files = self.get_files_by_appointment(appointment_id)
 
         return [
@@ -381,8 +463,30 @@ class APIClient:
 
 # Получение списка приемов врача с фильтрацией
     def get_doctor_appointments(self, date_from=None, date_to=None, search=None, status=None):
-        params = {}
+        """
+        @requires:
+            - пользователь авторизован как врач
+            - параметры фильтра корректны
 
+        @modifies:
+            - Ничего
+
+        @effects:
+            - Получает список приемов врача
+            - Применяет фильтры
+            - Форматирует даты через format_appointment
+
+        @raises:
+            - Exception при ошибке API
+
+        @returns:
+            - list приемов (с formatted_dt)
+        """
+
+        params = {}
+        params["limit"] = 50
+        params["offset"] = 0
+        
         if date_from:
             params["date_from"] = date_from
         if date_to:
@@ -402,6 +506,32 @@ class APIClient:
         return [self.format_appointment(app) for app in data]
 
     
+# Получение медицинской записи по ID приема
+    def get_record(self, appointment_id: int):
+        """
+        @requires:
+            - appointment_id валиден
+            - пользователь авторизован
+
+        @modifies:
+            - Ничего
+
+        @effects:
+            - Получает медицинскую запись по конкретному приему
+
+        @raises:
+            - Exception при ошибке API
+
+        @returns:
+            - dict с диагнозом, лечением, рекомендациями
+        """
+
+        return self._request(
+            "GET",
+            f"/medical-record/{appointment_id}"
+        )
+
+
 # Создание медицинской записи и (опционально) следующего визита
     def create_record(
         self,
@@ -411,10 +541,32 @@ class APIClient:
         recommendations: str = None,
         next_visit: str = None
     ):
+        """
+        @requires:
+            - appointment_id валиден
+            - пользователь авторизован как врач
+            - next_visit (если есть) в ISO формате
+
+        @modifies:
+            - Ничего (кроме отправки запроса)
+
+        @effects:
+            - Конвертирует next_visit в UTC
+            - Создает медицинскую запись
+            - Может инициировать повторный прием
+
+        @raises:
+            - Exception при неверном формате next_visit
+            - Exception при ошибке API
+
+        @returns:
+            - dict результат операции
+        """    
+    
         if next_visit:
             try:
                 next_visit = to_utc_iso(datetime.fromisoformat(next_visit))
-            except:
+            except ValueError:
                 raise Exception("Некорректный формат next_visit (YYYY-MM-DDTHH:MM)")
 
         return self._request(
@@ -433,6 +585,23 @@ class APIClient:
 
 # Получение медицинских записей пациента
     def get_my_records(self):
+        """
+        @requires:
+            - пользователь авторизован
+
+        @modifies:
+            - Ничего
+
+        @effects:
+            - Получает список медицинских записей пациента
+
+        @raises:
+            - Exception при ошибке API
+
+        @returns:
+            - list записей
+        """
+
         return self._request("GET", "/patient/records")
     
   
@@ -532,6 +701,24 @@ class APIClient:
 
 # Получение списка файлов по ID приема
     def get_files_by_appointment(self, appointment_id: int):
+        """
+        @requires:
+            - appointment_id валиден
+            - пользователь имеет доступ
+
+        @modifies:
+            - Ничего
+
+        @effects:
+            - Получает список файлов по приему
+
+        @raises:
+            - Exception при ошибке API
+
+        @returns:
+            - list файлов
+        """
+
         return self._request(
             "GET",
             f"/appointment/{appointment_id}/files"
@@ -599,6 +786,23 @@ class APIClient:
 
 # Получение URL файла для предпросмотра
     def get_file_url(self, file_id: str):
+        """
+        @requires:
+            - file_id валиден
+
+        @modifies:
+            - Ничего
+
+        @effects:
+            - Формирует URL для доступа к файлу
+
+        @raises:
+            - Ничего
+
+        @returns:
+            - строка URL файла
+        """
+
         return f"{self.base_url}/file/{file_id}"
 
 
@@ -642,11 +846,47 @@ class APIClient:
 
 # Функционал поиска для админа
     def admin_search(self, query: str):
+        """
+        @requires:
+            - query >= 2 символов
+            - пользователь admin
+
+        @modifies:
+            - Ничего
+
+        @effects:
+            - Выполняет поиск пользователей
+
+        @raises:
+            - Exception при ошибке API
+
+        @returns:
+            - list пользователей
+        """
+
         return self._request("GET", "/admin/search", params={"q": query})
 
 
 # Сброс пароля для пользователя
     def admin_reset_password(self, user_id: int):
+        """
+        @requires:
+            - user_id валиден
+            - пользователь admin
+
+        @modifies:
+            - password_hash пользователя (на сервере)
+
+        @effects:
+            - Инициирует сброс пароля
+
+        @raises:
+            - Exception при ошибке API
+
+        @returns:
+            - dict статус операции
+        """
+
         return self._request(
             "POST",
             f"/admin/reset-password/{user_id}"
