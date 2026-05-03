@@ -10,21 +10,21 @@ from logger import log_info, log_error
 def hash_password(password: str) -> str:
     """
     @requires:
-        - password — непустая строка
-        - bcrypt установлен и работает
+        - password является непустой строкой
+        - bcrypt установлен и доступен
 
     @modifies:
         - Ничего
 
     @effects:
-        - Генерирует хеш пароля с солью (bcrypt)
-        - Повышает безопасность хранения паролей
+        - Генерирует bcrypt-хеш пароля с солью
+        - Подготавливает пароль к безопасному хранению
 
     @raises:
-        - Exception при ошибке bcrypt
+        - Exception при ошибке bcrypt или некорректном входе
 
     @returns:
-        - str (хеш пароля)
+        - строчка bcrypt-хеш пароля
     """
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
@@ -33,21 +33,24 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, hashed: str) -> bool:
     """
     @requires:
-        - password — строка
-        - hashed — валидный bcrypt-хеш
+        - password является строкой
+        - hashed является валидным bcrypt-хешем
 
     @modifies:
         - Ничего
 
     @effects:
-        - Сравнивает пароль с хешем
+        - Проверяет соответствие пароля сохраненному хешу
 
     @raises:
-        - Exception если hashed поврежден или некорректен
+        - Exception при поврежденном или невалидном hashed
 
     @returns:
-        - bool (True если пароль совпадает)
+        - bool:
+            True — пароль совпадает
+            False — пароль неверный
     """
+
     return bcrypt.checkpw(password.encode(), hashed.encode())
 
 
@@ -60,26 +63,40 @@ def register_user(
 ):
     """
     @requires:
-        - username, email, password не пустые
-        - role_name существует в таблице roles
-        - при role_name="doctor" указан specialty_id
+        - username, email и password заполнены
+        - role_name передан
         - БД доступна
+        - Для doctor обязателен specialty_id
 
     @modifies:
-        - Таблица users (создание пользователя)
-        - Таблица employees или patients (создание профиля)
+        - Таблица users
+        - Таблица employees или patients
+        - Логи системы
 
     @effects:
-        - Проверяет уникальность пользователя
-        - Создает пользователя и профиль (врач или пациент)
+        - Нормализует username/email/role
+        - Выполняет базовую валидацию
+        - Проверяет уникальность username/email
+        - Проверяет существование роли
         - Хеширует пароль
+        - Создает пользователя
+        - Создает профиль врача или пациента
+        - Логирует результат
 
     @raises:
-        - Exception при ошибках БД (оборачивается в "Ошибка регистрации")
-
+        - Exception при ошибках БД
+        - Exception при ошибке регистрации (оборачивается)
+        
     @returns:
-        - (True, {"user_id": int}) при успехе
-        - (False, str) при бизнес-ошибке (валидация, дубликаты и т.д.)
+        - tuple:
+            (True, {"user_id": int}) при успешной регистрации
+            (False, str) при ошибке:
+                * пустые поля
+                * некорректный email
+                * короткий пароль
+                * дубликат пользователя
+                * неверная роль
+                * отсутствующий specialty_id
     """
 
     # 1. Нормализация роли
@@ -169,27 +186,33 @@ def login_user(username, password):
         - Таблицы users и roles существуют
 
     @modifies:
-        - Ничего
+        - Логи системы
 
     @effects:
         - Ищет пользователя по username или email
+        - Проверяет существование пользователя
+        - Проверяет необходимость forced reset
         - Проверяет пароль
-        - Проверяет необходимость сброса пароля
+        - Логирует успешные и неудачные попытки
 
     @raises:
         - Exception при ошибках БД
+        - Exception при ошибке bcrypt verify
 
     @returns:
-        - (True, dict) при успешной авторизации:
-            {
-                user_id: int,
-                role: str,
-                username: str
-            }
-        - (False, str) при ошибке:
-            * неверный логин/пароль
-            * требуется сброс пароля
+        - tuple:
+            (True, {
+                "user_id": int,
+                "role": str,
+                "username": str
+            })
+            при успешной авторизации
+
+            (False, str) при ошибке:
+                * "Неверный логин или пароль"
+                * "RESET_REQUIRED"
     """
+    
     with get_db_cursor() as cur:
         # Добавлен u.username в SELECT
         cur.execute("""
