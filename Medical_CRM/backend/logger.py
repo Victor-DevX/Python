@@ -32,8 +32,26 @@ logger.addHandler(file_handler)
 
 def log_info(message: str, **context):
     """
-    Логирование информационных событий
+    @requires:
+        - message передан
+        - logger инициализирован
+
+    @modifies:
+        - Лог-файл
+        - Консольный вывод
+
+    @effects:
+        - Записывает информационное сообщение уровня INFO
+        - Добавляет context при наличии
+        - Используется для бизнес-событий и обычных операций
+
+    @raises:
+        - Exception при ошибке logging subsystem
+
+    @returns:
+        - None
     """
+    
     if context:
         message = f"{message} | {context}"
     logger.info(message)
@@ -41,8 +59,27 @@ def log_info(message: str, **context):
 
 def log_error(message: str, error: Exception = None, **context):
     """
-    Логирование ошибок
+    @requires:
+        - message передан
+        - logger инициализирован
+
+    @modifies:
+        - Лог-файл
+        - Консольный вывод
+
+    @effects:
+        - Записывает сообщение уровня ERROR
+        - Добавляет текст ошибки (error)
+        - Добавляет дополнительный context
+        - Используется для ошибок API, БД, JWT и системных сбоев
+
+    @raises:
+        - Exception при ошибке logging subsystem
+
+    @returns:
+        - None
     """
+
     if error:
         message = f"{message} | error={str(error)}"
     if context:
@@ -52,7 +89,24 @@ def log_error(message: str, error: Exception = None, **context):
 
 def log_debug(message: str, **context):
     """
-    Логирование отладочной информации
+    @requires:
+        - message передан
+        - logger инициализирован
+
+    @modifies:
+        - Лог-файл (если DEBUG включен)
+        - Консольный вывод
+
+    @effects:
+        - Записывает debug-сообщение
+        - Добавляет context
+        - Используется для диагностики и разработки
+
+    @raises:
+        - Exception при ошибке logging subsystem
+
+    @returns:
+        - None
     """
     if context:
         message = f"{message} | {context}"
