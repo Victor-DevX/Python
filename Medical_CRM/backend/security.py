@@ -98,7 +98,25 @@ def decode_token(token: str):
     
 def check_login_allowed(identifier: str):
     """
-    Проверяет, не заблокирован ли пользователь временно.
+    @requires:
+        - identifier передан (username/email)
+        - brute-force state доступен (login_attempts, lockout_until)
+
+    @modifies:
+        - lockout_until (при истекшей блокировке)
+        - login_attempts (сброс после окончания блокировки)
+
+    @effects:
+        - Проверяет активна ли временная блокировка
+        - Рассчитывает оставшееся время ожидания
+        - Блокирует вход при превышении лимита
+        - Автоматически снимает истекшую блокировку
+
+    @raises:
+        - HTTPException(429) если пользователь временно заблокирован
+
+    @returns:
+        - None
     """
     blocked_until = lockout_until.get(identifier)
 
@@ -124,7 +142,25 @@ def check_login_allowed(identifier: str):
 
 def register_failed_login(identifier: str):
     """
-    Учитывает неудачную попытку входа.
+    @requires:
+        - identifier передан
+        - brute-force state инициализирован
+
+    @modifies:
+        - login_attempts
+        - lockout_until
+        - Логи системы
+
+    @effects:
+        - Увеличивает счетчик неудачных попыток
+        - Логирует попытку
+        - Активирует временную блокировку при достижении лимита
+
+    @raises:
+        - Ничего
+
+    @returns:
+        - None
     """
     login_attempts[identifier] += 1
 
@@ -147,7 +183,24 @@ def register_failed_login(identifier: str):
 
 def reset_login_attempts(identifier: str):
     """
-    Сбрасывает счетчик после успешного входа.
+    @requires:
+        - identifier передан
+
+    @modifies:
+        - login_attempts
+        - lockout_until
+        - Логи системы
+
+    @effects:
+        - Сбрасывает счетчик неудачных попыток
+        - Удаляет временную блокировку
+        - Используется после успешного входа
+
+    @raises:
+        - Ничего
+
+    @returns:
+        - None
     """
     login_attempts[identifier] = 0
 
@@ -165,21 +218,28 @@ def reset_login_attempts(identifier: str):
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """
     @requires:
-        - Authorization header содержит Bearer токен
+        - Authorization header содержит Bearer token
+        - credentials корректно извлечены FastAPI
         - token валиден
 
     @modifies:
         - Ничего
 
     @effects:
-        - Извлекает токен из заголовка
-        - Декодирует его
+        - Извлекает JWT токен
+        - Декодирует payload
+        - Возвращает данные текущего пользователя
 
     @raises:
-        - HTTPException(401) при отсутствии или невалидности токена
+        - HTTPException(401) при невалидном/отсутствующем токене
 
     @returns:
-        - dict с данными пользователя (user_id, role, username)
+        - dict:
+            {
+                user_id: int,
+                role: str,
+                username: str (если есть)
+            }
     """
     token = credentials.credentials
     payload = decode_token(token)
@@ -191,22 +251,24 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(securit
 def require_role(required_role: str):
     """
     @requires:
-        - required_role — строка (patient, doctor, admin)
-        - пользователь авторизован
+        - required_role является валидной ролью
+        - JWT dependency доступен
 
     @modifies:
-        - Ничего
+        - Логи системы
 
     @effects:
-        - Создает зависимость (dependency) для проверки роли
-        - Ограничивает доступ к эндпоинту
+        - Создает dependency wrapper
+        - Проверяет соответствие роли
+        - Ограничивает доступ к endpoint
 
     @raises:
-        - HTTPException(403) если роль не совпадает
+        - HTTPException(403) при недостатке прав
 
     @returns:
-        - функция role_checker (dependency)
+        - function role_checker
     """
+
     def role_checker(user=Depends(get_current_user)):
         
         if user["role"] != required_role:
@@ -226,21 +288,24 @@ def get_current_patient(user=Depends(require_role("patient"))):
     """
     @requires:
         - пользователь авторизован как patient
-        - запись в таблице employees существует
+        - Таблица patients доступна
 
     @modifies:
         - Ничего
 
     @effects:
-        - Получает ID врача по user_id
+        - Находит patient_id по user_id
+        - Проверяет существование профиля пациента
 
     @raises:
-        - HTTPException(403) если роль не patient
-        - HTTPException(404) если врач не найден
+        - HTTPException(403) если роль неверна
+        - HTTPException(404) если пациент не найден
+        - Exception при ошибке БД
 
     @returns:
         - int patient_id
     """
+
     with get_db_cursor() as cur:
         cur.execute(
             "SELECT id FROM patients WHERE user_id = %s",
@@ -256,6 +321,27 @@ def get_current_patient(user=Depends(require_role("patient"))):
 
 # Получение текущего ID врача с проверкой роли
 def get_current_doctor(user=Depends(require_role("doctor"))):
+    """
+    @requires:
+        - пользователь авторизован как doctor
+        - Таблица employees доступна
+
+    @modifies:
+        - Ничего
+
+    @effects:
+        - Находит doctor_id по user_id
+        - Проверяет существование профиля врача
+
+    @raises:
+        - HTTPException(403) если роль неверна
+        - HTTPException(404) если врач не найден
+        - Exception при ошибке БД
+
+    @returns:
+        - int doctor_id
+    """
+
     with get_db_cursor() as cur:
         cur.execute(
             "SELECT id FROM employees WHERE user_id = %s",
@@ -278,12 +364,14 @@ def get_current_admin(user=Depends(require_role("admin"))):
         - Ничего
 
     @effects:
-        - Проверяет роль администратора
+        - Проверяет admin role
+        - Возвращает user_id администратора
 
     @raises:
-        - HTTPException(403) если роль не admin
+        - HTTPException(403) если роль неверна
 
     @returns:
-        - int user_id администратора
+        - int admin user_id
     """
+    
     return user["user_id"]
