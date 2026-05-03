@@ -533,11 +533,11 @@ async function autoLogin() {
     userPanel.classList.remove("hidden");
 
     loadAppointments();
-  } catch {
-    logout();
+  } catch (e) {
+  console.error("AutoLogin error:", e);
+  logout();
   }
 }
-
 
 /* Таблица */
 
@@ -619,6 +619,11 @@ async function loadFiles(id){
     headers:getAuthHeaders()
   });
 
+  if(!res.ok){
+    alert("Ошибка загрузки списка файлов");
+    return;
+  }
+
   const files = await res.json();
 
   if(!files.length){
@@ -626,30 +631,56 @@ async function loadFiles(id){
     return;
   }
 
-  let html="";
-  files.forEach(f=>{
-    html+=`<div>${f.filename}
-      <button onclick="downloadFile('${f.file_id}','${f.filename}')">⬇️</button>
-    </div>`;
+  let message = "Прикрепленные файлы:\n\n";
+
+  files.forEach((f, index) => {
+    message += `${index + 1}. ${f.filename}\n`;
   });
 
-  const win = window.open();
-  win.document.write(html);
+  const selected = prompt(
+    message + "\nВведите номер файла для открытия:"
+  );
+
+  if(!selected) return;
+
+  const fileIndex = parseInt(selected) - 1;
+
+  if(
+    isNaN(fileIndex) ||
+    fileIndex < 0 ||
+    fileIndex >= files.length
+  ){
+    alert("Некорректный выбор");
+    return;
+  }
+
+  const file = files[fileIndex];
+
+  downloadFile(file.file_id, file.filename);
 }
 
-async function downloadFile(id,name){
+async function downloadFile(id, name){
   const res = await fetch(API+`/file/${id}`,{
     headers:getAuthHeaders()
   });
 
+  if(!res.ok){
+    alert("Ошибка загрузки файла");
+    return;
+  }
+
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
 
-  const a=document.createElement("a");
-  a.href=url;
-  a.download=name;
-  a.click();
+  const newTab = window.open(url, "_blank");
+
+  if(!newTab){
+    alert("Браузер заблокировал открытие вкладки");
+  }
+
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
+
 </script>
 
 </body>
